@@ -1,0 +1,28 @@
+Hey Team! 👋
+
+I've finished building **Coffee Roulette** - our internal employee pairing system for fostering cross-department connections. The app is complete and ready for testing!
+
+🎯 **What's Done:**
+✅ Full backend API (Node.js + Express, 40+ endpoints)
+✅ Polished React admin dashboard with analytics
+✅ Smart matching algorithm
+✅ Microsoft OAuth integration (needs your help!)
+✅ Calendar & email/Teams notifications
+✅ All code pushed to GitHub: https://github.com/sheldongold-mercator/coffee-roulette
+
+🚨 **What I Need (Urgent):**
+To test locally before AWS deployment, I need:
+1. Azure AD Client ID, Tenant ID, and Client Secret
+2. Redirect URIs configured (localhost for testing + production URLs)
+3. API permissions granted (User.Read, User.Read.All, Calendars.ReadWrite)
+
+📋 **Next Steps:**
+- **This Week:** Local testing with real Microsoft auth
+- **Next Week:** Deploy to AWS with subdomains (coffee-roulette.mercator.com)
+
+I've attached a detailed doc with full technical specs, architecture diagram, and everything you need to help get this set up.
+
+Can you help get the Azure AD credentials sorted? Happy to jump on a call if easier!
+
+Thanks! 🙏
+Sheldon
