@@ -8,8 +8,9 @@ import { msalConfig } from './config/msal';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/Layout/AdminLayout';
+import PortalLayout from './components/Layout/PortalLayout';
 
-// Pages
+// Admin Pages
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
@@ -18,6 +19,11 @@ import Matching from './pages/Matching';
 import Analytics from './pages/Analytics';
 import Templates from './pages/Templates';
 import Settings from './pages/Settings';
+
+// Portal Pages
+import PortalHome from './pages/portal/PortalHome';
+import PairingHistory from './pages/portal/PairingHistory';
+import Profile from './pages/portal/Profile';
 
 // Initialize MSAL
 const msalInstance = new PublicClientApplication(msalConfig);
@@ -106,6 +112,20 @@ function App() {
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
 
+              {/* Protected User Portal Routes */}
+              <Route
+                path="/portal"
+                element={
+                  <ProtectedRoute>
+                    <PortalLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<PortalHome />} />
+                <Route path="history" element={<PairingHistory />} />
+                <Route path="profile" element={<Profile />} />
+              </Route>
+
               {/* Protected Admin Routes */}
               <Route
                 path="/admin"
@@ -125,9 +145,9 @@ function App() {
                 <Route path="settings" element={<Settings />} />
               </Route>
 
-              {/* Default Route */}
-              <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+              {/* Default Route - Send to Portal for regular users */}
+              <Route path="/" element={<Navigate to="/portal" replace />} />
+              <Route path="*" element={<Navigate to="/portal" replace />} />
             </Routes>
           </Router>
 
