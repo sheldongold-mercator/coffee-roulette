@@ -1,4 +1,4 @@
-const { User, Department } = require('../models');
+const { User, Department, Pairing, MeetingFeedback, MatchingRound } = require('../models');
 const { Op } = require('sequelize');
 const microsoftGraphService = require('../services/microsoftGraphService');
 const logger = require('../utils/logger');
@@ -119,7 +119,7 @@ const getUsers = async (req, res) => {
 };
 
 /**
- * Get specific user by ID
+ * Get specific user by ID with pairing history
  */
 const getUserById = async (req, res) => {
   try {
@@ -145,6 +145,74 @@ const getUserById = async (req, res) => {
       });
     }
 
+    // Fetch pairing history for this user
+    const pairings = await Pairing.findAll({
+      where: {
+        [Op.or]: [
+          { user1_id: userId },
+          { user2_id: userId }
+        ]
+      },
+      include: [
+        {
+          model: User,
+          as: 'user1',
+          attributes: ['id', 'first_name', 'last_name', 'email']
+        },
+        {
+          model: User,
+          as: 'user2',
+          attributes: ['id', 'first_name', 'last_name', 'email']
+        },
+        {
+          model: MatchingRound,
+          as: 'matchingRound',
+          attributes: ['id', 'name', 'start_date', 'end_date']
+        },
+        {
+          model: MeetingFeedback,
+          as: 'feedback',
+          where: { user_id: userId },
+          required: false,
+          attributes: ['id', 'rating', 'comments', 'created_at']
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: 20
+    });
+
+    // Transform pairings to show partner info
+    const pairingHistory = pairings.map(pairing => {
+      const isUser1 = pairing.user1_id === parseInt(userId, 10);
+      const partner = isUser1 ? pairing.user2 : pairing.user1;
+      const userFeedback = pairing.feedback && pairing.feedback.length > 0 ? pairing.feedback[0] : null;
+
+      return {
+        id: pairing.id,
+        partner: partner ? {
+          id: partner.id,
+          firstName: partner.first_name,
+          lastName: partner.last_name,
+          email: partner.email
+        } : null,
+        status: pairing.status,
+        meetingScheduledAt: pairing.meeting_scheduled_at,
+        meetingCompletedAt: pairing.meeting_completed_at,
+        round: pairing.matchingRound ? {
+          id: pairing.matchingRound.id,
+          name: pairing.matchingRound.name,
+          startDate: pairing.matchingRound.start_date,
+          endDate: pairing.matchingRound.end_date
+        } : null,
+        feedback: userFeedback ? {
+          rating: userFeedback.rating,
+          comments: userFeedback.comments,
+          submittedAt: userFeedback.created_at
+        } : null,
+        createdAt: pairing.created_at
+      };
+    });
+
     res.json({
       user: {
         id: user.id,
@@ -169,6 +237,15 @@ const getUserById = async (req, res) => {
         lastSyncedAt: user.last_synced_at,
         createdAt: user.created_at,
         updatedAt: user.updated_at
+      },
+      pairingHistory,
+      stats: {
+        totalPairings: pairings.length,
+        completedPairings: pairings.filter(p => p.status === 'completed').length,
+        averageRating: pairings
+          .filter(p => p.feedback && p.feedback.length > 0)
+          .reduce((acc, p) => acc + (p.feedback[0]?.rating || 0), 0) /
+          (pairings.filter(p => p.feedback && p.feedback.length > 0).length || 1) || null
       }
     });
   } catch (error) {

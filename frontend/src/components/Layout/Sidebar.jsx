@@ -10,6 +10,7 @@ import {
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
   EnvelopeIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -103,9 +104,17 @@ const Sidebar = () => {
           </div>
         </div>
 
+        <NavLink
+          to="/portal"
+          className="mt-2 w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+        >
+          <UserCircleIcon className="w-5 h-5 text-gray-500" />
+          <span>View as Employee</span>
+        </NavLink>
+
         <button
           onClick={logout}
-          className="mt-2 w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
         >
           <ArrowRightOnRectangleIcon className="w-5 h-5 text-gray-500" />
           <span>Sign out</span>

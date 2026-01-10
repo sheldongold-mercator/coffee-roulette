@@ -3,12 +3,12 @@ import { useQuery } from 'react-query';
 import { motion } from 'framer-motion';
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   ArrowPathIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { userAPI, analyticsAPI, departmentAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import UserDetailModal from '../components/users/UserDetailModal';
 
 const Users = () => {
   const [search, setSearch] = useState('');
@@ -18,6 +18,7 @@ const Users = () => {
     participation: '',    // 'eligible', 'opted_in_excluded', 'opted_out'
   });
   const [page, setPage] = useState(1);
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const limit = 20;
 
   const { data: usersData, isLoading, refetch } = useQuery(
@@ -243,7 +244,10 @@ const Users = () => {
                     </td>
                     <td className="text-gray-600">{user.totalPairings || 0}</td>
                     <td>
-                      <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                      <button
+                        onClick={() => setSelectedUserId(user.id)}
+                        className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                      >
                         View Details
                       </button>
                     </td>
@@ -281,6 +285,14 @@ const Users = () => {
           </div>
         )}
       </motion.div>
+
+      {/* User Detail Modal */}
+      {selectedUserId && (
+        <UserDetailModal
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+        />
+      )}
     </div>
   );
 };
