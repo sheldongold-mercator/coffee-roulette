@@ -16,6 +16,7 @@ import Users from './pages/Users';
 import Departments from './pages/Departments';
 import Matching from './pages/Matching';
 import Analytics from './pages/Analytics';
+import Templates from './pages/Templates';
 import Settings from './pages/Settings';
 
 // Initialize MSAL
@@ -120,6 +121,7 @@ function App() {
                 <Route path="departments" element={<Departments />} />
                 <Route path="matching" element={<Matching />} />
                 <Route path="analytics" element={<Analytics />} />
+                <Route path="templates" element={<Templates />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
 

@@ -84,15 +84,19 @@ const Analytics = () => {
     }
   };
 
-  // Handle both old and new API formats
-  const deptData = Array.isArray(departmentStats?.data)
+  // Handle axios response wrapper: response.data.data
+  const deptData = Array.isArray(departmentStats?.data?.data)
+    ? departmentStats.data.data
+    : Array.isArray(departmentStats?.data)
     ? departmentStats.data
     : Array.isArray(departmentStats?.departments)
     ? departmentStats.departments
     : [];
-  const feedbackData = feedbackStats?.data || feedbackStats?.feedback || {};
-  const crossDept = crossDeptStats?.data || crossDeptStats?.crossDepartment || {};
-  const leaders = Array.isArray(leaderboard?.data)
+  const feedbackData = feedbackStats?.data?.data || feedbackStats?.data || feedbackStats?.feedback || {};
+  const crossDept = crossDeptStats?.data?.data || crossDeptStats?.data || crossDeptStats?.crossDepartment || {};
+  const leaders = Array.isArray(leaderboard?.data?.data)
+    ? leaderboard.data.data
+    : Array.isArray(leaderboard?.data)
     ? leaderboard.data
     : Array.isArray(leaderboard?.leaderboard)
     ? leaderboard.leaderboard

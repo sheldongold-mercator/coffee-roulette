@@ -90,10 +90,12 @@ const Dashboard = () => {
     () => analyticsAPI.getRecentActivity(10)
   );
 
-  const stats = overview?.data || {};
-  const trends = participationTrends?.data || [];
-  // Handle both old format (activities) and new format (data)
-  const activities = Array.isArray(recentActivity?.data)
+  // Handle axios response wrapper: response.data.data
+  const stats = overview?.data?.data || overview?.data || {};
+  const trends = participationTrends?.data?.data || participationTrends?.data || [];
+  const activities = Array.isArray(recentActivity?.data?.data)
+    ? recentActivity.data.data
+    : Array.isArray(recentActivity?.data)
     ? recentActivity.data
     : Array.isArray(recentActivity?.activities)
     ? recentActivity.activities
@@ -116,26 +118,26 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Users"
-          value={stats.totalUsers || 0}
+          value={stats.users?.total || stats.totalUsers || 0}
           icon={UsersIcon}
           loading={overviewLoading}
         />
         <StatCard
           title="Active Departments"
-          value={stats.activeDepartments || 0}
+          value={stats.departments?.active || stats.activeDepartments || 0}
           icon={BuildingOfficeIcon}
           loading={overviewLoading}
         />
         <StatCard
           title="Participation Rate"
-          value={`${stats.participationRate || 0}%`}
+          value={`${stats.users?.participationRate || stats.participationRate || 0}%`}
           icon={ChartBarIcon}
           trend={stats.participationTrend}
           loading={overviewLoading}
         />
         <StatCard
           title="Completion Rate"
-          value={`${stats.completionRate || 0}%`}
+          value={`${stats.engagement?.completionRate || stats.completionRate || 0}%`}
           icon={CheckCircleIcon}
           trend={stats.completionTrend}
           loading={overviewLoading}

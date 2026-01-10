@@ -153,15 +153,17 @@ const Settings = () => {
     }
   };
 
-  // Handle settings data - convert object to array
-  const settingsObj = settingsData?.data || settingsData?.settings || {};
+  // Handle axios response wrapper: response.data.data
+  const settingsObj = settingsData?.data?.data || settingsData?.data || settingsData?.settings || {};
   const settings = Object.entries(settingsObj).map(([key, value]) => ({
     key,
     category: key.split('.')[0], // Extract category from key (e.g., "matching.weight" -> "matching")
     ...value
   }));
 
-  const jobs = Array.isArray(jobStatus?.data)
+  const jobs = Array.isArray(jobStatus?.data?.data)
+    ? jobStatus.data.data
+    : Array.isArray(jobStatus?.data)
     ? jobStatus.data
     : Array.isArray(jobStatus?.jobs)
     ? jobStatus.jobs

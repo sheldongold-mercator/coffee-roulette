@@ -7,15 +7,15 @@ import {
   ArrowPathIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
-import { userAPI, analyticsAPI } from '../services/api';
+import { userAPI, analyticsAPI, departmentAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
 const Users = () => {
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
     department: '',
-    status: '',
-    isActive: '',
+    status: '',           // 'active' or 'inactive' - user account status
+    participation: '',    // 'eligible', 'opted_in_excluded', 'opted_out'
   });
   const [page, setPage] = useState(1);
   const limit = 20;
@@ -24,6 +24,17 @@ const Users = () => {
     ['users', 'v2', { search, ...filters, page, limit }],
     () => userAPI.getUsers({ search, ...filters, page, limit })
   );
+
+  const { data: departmentsData } = useQuery(['departments-list'], () =>
+    departmentAPI.getDepartments()
+  );
+
+  // Extract departments for dropdown
+  const departmentsList = Array.isArray(departmentsData?.data?.data)
+    ? departmentsData.data.data
+    : Array.isArray(departmentsData?.data)
+    ? departmentsData.data
+    : [];
 
   const handleSync = async () => {
     try {
@@ -61,14 +72,16 @@ const Users = () => {
   };
 
   // Handle both old and new API formats
-  const users = Array.isArray(usersData?.data)
+  const users = Array.isArray(usersData?.data?.data)
+    ? usersData.data.data
+    : Array.isArray(usersData?.data)
     ? usersData.data
     : Array.isArray(usersData?.data?.users)
     ? usersData.data.users
     : Array.isArray(usersData?.users)
     ? usersData.users
     : [];
-  const pagination = usersData?.pagination || {};
+  const pagination = usersData?.data?.pagination || usersData?.pagination || {};
 
   return (
     <div className="space-y-6">
@@ -123,13 +136,14 @@ const Users = () => {
             className="input"
           >
             <option value="">All Departments</option>
-            <option value="Engineering">Engineering</option>
-            <option value="Sales">Sales</option>
-            <option value="Marketing">Marketing</option>
-            <option value="HR">HR</option>
+            {departmentsList.map((dept) => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name}
+              </option>
+            ))}
           </select>
 
-          {/* Status Filter */}
+          {/* Status Filter (Account Active/Inactive) */}
           <select
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
@@ -140,15 +154,16 @@ const Users = () => {
             <option value="inactive">Inactive</option>
           </select>
 
-          {/* Active Filter */}
+          {/* Participation Filter */}
           <select
-            value={filters.isActive}
-            onChange={(e) => setFilters({ ...filters, isActive: e.target.value })}
+            value={filters.participation}
+            onChange={(e) => setFilters({ ...filters, participation: e.target.value })}
             className="input"
           >
-            <option value="">All Users</option>
-            <option value="true">Participating</option>
-            <option value="false">Not Participating</option>
+            <option value="">All Participation</option>
+            <option value="eligible">Eligible</option>
+            <option value="opted_in_excluded">Opted In (Dept Excluded)</option>
+            <option value="opted_out">Opted Out</option>
           </select>
         </div>
       </motion.div>
@@ -192,12 +207,12 @@ const Users = () => {
                 users.map((user) => (
                   <tr key={user.id}>
                     <td className="font-medium text-gray-900">
-                      {user.displayName}
+                      {user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown'}
                     </td>
                     <td className="text-gray-600">{user.email}</td>
                     <td>
                       <span className="badge badge-info">
-                        {user.department || 'N/A'}
+                        {user.department?.name || user.department || 'N/A'}
                       </span>
                     </td>
                     <td>
@@ -212,10 +227,18 @@ const Users = () => {
                     <td>
                       <span
                         className={`badge ${
-                          user.optedIn ? 'badge-success' : 'badge-warning'
+                          user.participationStatus === 'eligible'
+                            ? 'badge-success'
+                            : user.participationStatus === 'opted_in_excluded'
+                            ? 'badge-warning'
+                            : 'badge-error'
                         }`}
                       >
-                        {user.optedIn ? 'Opted In' : 'Opted Out'}
+                        {user.participationStatus === 'eligible'
+                          ? 'Eligible'
+                          : user.participationStatus === 'opted_in_excluded'
+                          ? 'Dept Excluded'
+                          : 'Opted Out'}
                       </span>
                     </td>
                     <td className="text-gray-600">{user.totalPairings || 0}</td>

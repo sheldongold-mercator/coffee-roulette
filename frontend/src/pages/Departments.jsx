@@ -136,8 +136,10 @@ const Departments = () => {
     }
   };
 
-  // Handle both old format (departments) and new format (data)
-  const departments = Array.isArray(departmentsData?.data)
+  // Handle axios response wrapper: response.data.data
+  const departments = Array.isArray(departmentsData?.data?.data)
+    ? departmentsData.data.data
+    : Array.isArray(departmentsData?.data)
     ? departmentsData.data
     : Array.isArray(departmentsData?.departments)
     ? departmentsData.departments

@@ -51,14 +51,16 @@ const Matching = () => {
     }
   };
 
-  // Handle both old and new API formats
-  const rounds = Array.isArray(roundsData?.data)
-    ? roundsData.data
+  // Handle axios response wrapper: response.data.data
+  const rounds = Array.isArray(roundsData?.data?.data)
+    ? roundsData.data.data
     : Array.isArray(roundsData?.data?.rounds)
     ? roundsData.data.rounds
+    : Array.isArray(roundsData?.data)
+    ? roundsData.data
     : [];
-  const eligibleCount = eligibleData?.data?.count || 0;
-  const preview = previewData?.data?.preview || previewData?.preview || null;
+  const eligibleCount = eligibleData?.data?.data?.count || eligibleData?.data?.count || 0;
+  const preview = previewData?.data?.data || previewData?.data?.preview || previewData?.preview || null;
 
   return (
     <div className="space-y-6">

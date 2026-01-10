@@ -12,6 +12,7 @@ const models = {
   PairingIcebreaker: require('./PairingIcebreaker')(sequelize),
   SystemSetting: require('./SystemSetting')(sequelize),
   NotificationQueue: require('./NotificationQueue')(sequelize),
+  NotificationTemplate: require('./NotificationTemplate')(sequelize),
   AdminUser: require('./AdminUser')(sequelize),
   AuditLog: require('./AuditLog')(sequelize)
 };

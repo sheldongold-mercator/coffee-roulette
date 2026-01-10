@@ -13,8 +13,9 @@ const getUsers = async (req, res) => {
       limit = 50,
       search,
       department,
-      isActive,
-      isOptedIn,
+      status,        // 'active' or 'inactive' - filters is_active
+      isOptedIn,     // 'true' or 'false' - filters is_opted_in
+      participation, // 'eligible', 'opted_in_excluded', 'opted_out' - computed status
       sortBy = 'created_at',
       sortOrder = 'DESC'
     } = req.query;
@@ -35,13 +36,13 @@ const getUsers = async (req, res) => {
       where.department_id = department;
     }
 
-    // Active filter
-    if (isActive !== undefined) {
-      where.is_active = isActive === 'true';
+    // Status filter (user account active/inactive)
+    if (status !== undefined && status !== '') {
+      where.is_active = status === 'active';
     }
 
-    // Opted in filter
-    if (isOptedIn !== undefined) {
+    // Opted in filter (check for non-empty string)
+    if (isOptedIn !== undefined && isOptedIn !== '') {
       where.is_opted_in = isOptedIn === 'true';
     }
 
@@ -64,26 +65,43 @@ const getUsers = async (req, res) => {
       offset
     });
 
+    // Helper to compute participation status
+    const getParticipationStatus = (user) => {
+      if (!user.is_opted_in) return 'opted_out';
+      if (!user.department || !user.department.is_active) return 'opted_in_excluded';
+      return 'eligible';
+    };
+
+    // Filter by participation status if specified
+    let filteredUsers = users.rows;
+    if (participation && participation !== '') {
+      filteredUsers = users.rows.filter(user => getParticipationStatus(user) === participation);
+    }
+
     res.json({
-      data: users.rows.map(user => ({
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        department: user.department ? {
-          id: user.department.id,
-          name: user.department.name,
-          isActive: user.department.is_active
-        } : null,
-        role: user.role,
-        seniorityLevel: user.seniority_level,
-        isActive: user.is_active,
-        isOptedIn: user.is_opted_in,
-        isAdmin: !!user.adminRole,
-        adminRole: user.adminRole ? user.adminRole.role : null,
-        lastSyncedAt: user.last_synced_at,
-        createdAt: user.created_at
-      })),
+      data: filteredUsers.map(user => {
+        const participationStatus = getParticipationStatus(user);
+        return {
+          id: user.id,
+          email: user.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          department: user.department ? {
+            id: user.department.id,
+            name: user.department.name,
+            isActive: user.department.is_active
+          } : null,
+          role: user.role,
+          seniorityLevel: user.seniority_level,
+          isActive: user.is_active,
+          isOptedIn: user.is_opted_in,
+          participationStatus, // 'eligible', 'opted_in_excluded', or 'opted_out'
+          isAdmin: !!user.adminRole,
+          adminRole: user.adminRole ? user.adminRole.role : null,
+          lastSyncedAt: user.last_synced_at,
+          createdAt: user.created_at
+        };
+      }),
       pagination: {
         total: users.count,
         page: parseInt(page, 10),
@@ -241,6 +259,9 @@ const updateUser = async (req, res) => {
  */
 const syncUsers = async (req, res) => {
   try {
+    const { v4: uuidv4 } = require('uuid');
+    const emailService = require('../services/emailService');
+
     logger.info(`Admin ${req.user.id} initiated user sync`);
 
     // Get all users from Microsoft Graph API
@@ -250,7 +271,9 @@ const syncUsers = async (req, res) => {
     let created = 0;
     let updated = 0;
     let skipped = 0;
+    let welcomeEmailsSent = 0;
     const errors = [];
+    const newUsersInActiveDepts = [];
 
     // Process each user
     for (const msUser of msUsers) {
@@ -262,17 +285,20 @@ const syncUsers = async (req, res) => {
           continue;
         }
 
-        // Find or create department
+        // Find or create department (new departments start inactive)
         let department = null;
         if (msUser.department) {
           [department] = await Department.findOrCreate({
             where: { name: msUser.department },
             defaults: {
               name: msUser.department,
-              is_active: true
+              is_active: false // New departments start inactive
             }
           });
         }
+
+        // Check if department is active (for auto opt-in of new users)
+        const isDeptActive = department?.is_active || false;
 
         // Find or create user
         const [user, isCreated] = await User.findOrCreate({
@@ -284,9 +310,12 @@ const syncUsers = async (req, res) => {
             last_name: msUser.surname || msUser.displayName?.split(' ').slice(1).join(' ') || 'User',
             department_id: department?.id,
             role: msUser.jobTitle,
-            seniority_level: 'mid', // Default, can be updated manually
+            seniority_level: 'mid',
             is_active: true,
-            is_opted_in: false, // Users must opt-in manually
+            // Auto opt-in if department is active
+            is_opted_in: isDeptActive,
+            opted_in_at: isDeptActive ? new Date() : null,
+            opt_out_token: uuidv4(),
             last_synced_at: new Date()
           }
         });
@@ -294,16 +323,31 @@ const syncUsers = async (req, res) => {
         if (isCreated) {
           created++;
           logger.info(`Created new user: ${email}`);
+
+          // If department is active, queue welcome email
+          if (isDeptActive) {
+            newUsersInActiveDepts.push({
+              user,
+              departmentName: department?.name
+            });
+          }
         } else {
-          // Update existing user
-          await user.update({
+          // Update existing user (but don't change opt-in status)
+          const updates = {
             email: email,
             first_name: msUser.givenName || user.first_name,
             last_name: msUser.surname || user.last_name,
             department_id: department?.id || user.department_id,
             role: msUser.jobTitle || user.role,
             last_synced_at: new Date()
-          });
+          };
+
+          // Generate opt_out_token if missing
+          if (!user.opt_out_token) {
+            updates.opt_out_token = uuidv4();
+          }
+
+          await user.update(updates);
           updated++;
           logger.info(`Updated existing user: ${email}`);
         }
@@ -317,7 +361,19 @@ const syncUsers = async (req, res) => {
       }
     }
 
-    logger.info(`User sync completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`);
+    // Send welcome emails to new users in active departments
+    for (const { user, departmentName } of newUsersInActiveDepts) {
+      try {
+        await emailService.sendWelcomeEmail(user, departmentName);
+        await user.update({ welcome_sent_at: new Date() });
+        welcomeEmailsSent++;
+        logger.info(`Sent welcome email to new user: ${user.email}`);
+      } catch (emailError) {
+        logger.error(`Failed to send welcome email to ${user.email}:`, emailError);
+      }
+    }
+
+    logger.info(`User sync completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors, ${welcomeEmailsSent} welcome emails sent`);
 
     res.json({
       success: true,
@@ -327,7 +383,8 @@ const syncUsers = async (req, res) => {
         created,
         updated,
         skipped,
-        errors: errors.length
+        errors: errors.length,
+        welcomeEmailsSent
       },
       errors: errors.length > 0 ? errors : undefined
     });

@@ -22,12 +22,23 @@ class MatchingService {
 
   /**
    * Get eligible participants for matching
+   * Excludes users who opted in within the grace period (48 hours by default)
    */
   async getEligibleParticipants() {
+    // Get grace period setting (in hours), default to 48 hours
+    const gracePeriodHours = await this.getSetting('matching.grace_period_hours', 48);
+    const gracePeriodCutoff = new Date(Date.now() - gracePeriodHours * 60 * 60 * 1000);
+
     const users = await User.findAll({
       where: {
         is_active: true,
-        is_opted_in: true
+        is_opted_in: true,
+        // Exclude users who opted in within the grace period
+        // Users must have opted in before the cutoff time, OR have no opted_in_at date (legacy users)
+        [Op.or]: [
+          { opted_in_at: { [Op.lt]: gracePeriodCutoff } },
+          { opted_in_at: null }
+        ]
       },
       include: [
         {
@@ -40,7 +51,7 @@ class MatchingService {
       ]
     });
 
-    logger.info(`Found ${users.length} eligible participants for matching`);
+    logger.info(`Found ${users.length} eligible participants for matching (grace period: ${gracePeriodHours}h)`);
     return users;
   }
 

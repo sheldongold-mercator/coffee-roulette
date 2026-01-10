@@ -1,5 +1,7 @@
 const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 const logger = require('../utils/logger');
+const { NotificationTemplate } = require('../models');
+const { interpolate, prepareVariables } = require('../utils/templateInterpolation');
 
 class EmailService {
   constructor() {
@@ -13,6 +15,44 @@ class EmailService {
 
     this.fromEmail = process.env.EMAIL_FROM || 'noreply@mercator.com';
     this.isDevelopment = process.env.NODE_ENV !== 'production';
+  }
+
+  /**
+   * Get template from database or fall back to file-based template
+   * @param {string} templateType - Type of template (welcome, pairing_notification, etc.)
+   * @param {object} variables - Variables to interpolate
+   * @returns {object} - { subject, html, text }
+   */
+  async getTemplate(templateType, variables) {
+    try {
+      // Check for custom template in database
+      const dbTemplate = await NotificationTemplate.findOne({
+        where: {
+          template_type: templateType,
+          channel: 'email',
+          is_active: true
+        }
+      });
+
+      if (dbTemplate) {
+        // Use database template with variable interpolation
+        const preparedVars = prepareVariables(variables, templateType);
+        return {
+          subject: interpolate(dbTemplate.subject, preparedVars),
+          html: interpolate(dbTemplate.html_content, preparedVars),
+          text: interpolate(dbTemplate.text_content, preparedVars)
+        };
+      }
+    } catch (error) {
+      logger.warn('Error loading template from database, falling back to file:', {
+        templateType,
+        error: error.message
+      });
+    }
+
+    // Fall back to file-based template
+    const fileTemplate = require(`../templates/emails/${templateType}`);
+    return fileTemplate(variables);
   }
 
   /**
@@ -82,9 +122,7 @@ class EmailService {
    * Send pairing notification email
    */
   async sendPairingNotification(pairing, user, partner, icebreakers) {
-    const pairingTemplate = require('../templates/emails/pairingNotification');
-
-    const { subject, html, text } = pairingTemplate({
+    const variables = {
       userName: user.first_name,
       partnerName: `${partner.first_name} ${partner.last_name}`,
       partnerEmail: partner.email,
@@ -92,7 +130,9 @@ class EmailService {
       meetingDate: pairing.meeting_scheduled_at,
       icebreakers: icebreakers.map(ib => ib.topic),
       pairingId: pairing.id
-    });
+    };
+
+    const { subject, html, text } = await this.getTemplate('pairing_notification', variables);
 
     return this.sendEmail({
       to: user.email,
@@ -106,16 +146,16 @@ class EmailService {
    * Send meeting reminder email
    */
   async sendMeetingReminder(pairing, user, partner, icebreakers, daysUntil) {
-    const reminderTemplate = require('../templates/emails/meetingReminder');
-
-    const { subject, html, text } = reminderTemplate({
+    const variables = {
       userName: user.first_name,
       partnerName: `${partner.first_name} ${partner.last_name}`,
       meetingDate: pairing.meeting_scheduled_at,
       daysUntil,
       icebreakers: icebreakers.map(ib => ib.topic),
       pairingId: pairing.id
-    });
+    };
+
+    const { subject, html, text } = await this.getTemplate('meeting_reminder', variables);
 
     return this.sendEmail({
       to: user.email,
@@ -129,13 +169,13 @@ class EmailService {
    * Send feedback request email
    */
   async sendFeedbackRequest(pairing, user, partner) {
-    const feedbackTemplate = require('../templates/emails/feedbackRequest');
-
-    const { subject, html, text } = feedbackTemplate({
+    const variables = {
       userName: user.first_name,
       partnerName: `${partner.first_name} ${partner.last_name}`,
       pairingId: pairing.id
-    });
+    };
+
+    const { subject, html, text } = await this.getTemplate('feedback_request', variables);
 
     return this.sendEmail({
       to: user.email,
@@ -143,6 +183,79 @@ class EmailService {
       htmlBody: html,
       textBody: text
     });
+  }
+
+  /**
+   * Send welcome email to new Coffee Roulette participant
+   */
+  async sendWelcomeEmail(user, departmentName = null) {
+    const variables = {
+      userName: user.first_name,
+      userEmail: user.email,
+      departmentName,
+      optOutToken: user.opt_out_token,
+      portalLink: process.env.FRONTEND_URL || 'http://localhost',
+      optOutLink: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/public/opt-out/${user.opt_out_token}`
+    };
+
+    const { subject, html, text } = await this.getTemplate('welcome', variables);
+
+    return this.sendEmail({
+      to: user.email,
+      subject,
+      htmlBody: html,
+      textBody: text
+    });
+  }
+
+  /**
+   * Send welcome emails to multiple users (batch)
+   * Returns results and updates welcome_sent_at for successful sends
+   */
+  async sendBulkWelcomeEmails(users, departmentName = null) {
+    const results = [];
+
+    for (const user of users) {
+      try {
+        const variables = {
+          userName: user.first_name,
+          userEmail: user.email,
+          departmentName,
+          optOutToken: user.opt_out_token,
+          portalLink: process.env.FRONTEND_URL || 'http://localhost',
+          optOutLink: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/public/opt-out/${user.opt_out_token}`
+        };
+
+        const { subject, html, text } = await this.getTemplate('welcome', variables);
+
+        const result = await this.sendEmail({
+          to: user.email,
+          subject,
+          htmlBody: html,
+          textBody: text
+        });
+
+        // Update welcome_sent_at
+        await user.update({ welcome_sent_at: new Date() });
+
+        results.push({ success: true, userId: user.id, email: user.email, ...result });
+      } catch (error) {
+        results.push({
+          success: false,
+          userId: user.id,
+          email: user.email,
+          error: error.message
+        });
+      }
+    }
+
+    logger.info('Bulk welcome email send completed:', {
+      total: users.length,
+      successful: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length
+    });
+
+    return results;
   }
 
   /**

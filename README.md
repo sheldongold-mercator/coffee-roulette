@@ -9,6 +9,7 @@ Coffee Roulette automatically pairs employees monthly for casual coffee meetings
 - **Random Pairing Algorithm**: Smart matching with constraints to avoid recent repeats and encourage cross-department connections
 - **Microsoft Integration**: OAuth authentication, Outlook calendar auto-scheduling, Teams notifications
 - **Department Management**: Phased rollout capability - enable specific departments gradually
+- **User Onboarding**: Automatic opt-in with welcome emails and one-click opt-out links
 - **Meeting Tracking**: Confirm meetings, collect feedback and ratings
 - **Admin Dashboard**: Analytics, user management, matching controls
 - **Automated Workflows**: Scheduled matching, notifications, and reminders
@@ -264,18 +265,34 @@ npm run build
 
 ### Admin Endpoints
 
-- `GET /api/admin/users` - List users
-- `POST /api/admin/users/sync` - Sync from Microsoft
-- `GET /api/admin/departments` - List departments
-- `POST /api/admin/departments/:id/enable` - Enable department
+- `GET /api/admin/users` - List users with filtering (status, department, participation)
+- `PUT /api/admin/users/:id` - Update user details
+- `POST /api/admin/users/sync` - Sync users from Microsoft Graph API
+- `GET /api/admin/users/stats` - Get user statistics
+- `GET /api/admin/departments` - List departments with user counts
+- `GET /api/admin/departments/:id` - Get department details
+- `POST /api/admin/departments` - Create department
+- `PUT /api/admin/departments/:id` - Update department
+- `POST /api/admin/departments/:id/enable` - Enable department (triggers auto opt-in and welcome emails)
+- `POST /api/admin/departments/:id/disable` - Disable department
 - `POST /api/admin/matching/run` - Trigger matching manually
-- `GET /api/admin/analytics/overview` - Get analytics
+- `GET /api/admin/matching/preview` - Preview matching without executing
+- `GET /api/admin/analytics/overview` - Get analytics dashboard data
+
+### Public Endpoints (No Authentication Required)
+
+- `GET /api/public/opt-out/:token` - One-click opt-out from Coffee Roulette
+- `GET /api/public/opt-in/:token` - One-click opt back in
+- `GET /api/public/status/:token` - Check subscription status
 
 ## Database Schema
 
 Key tables:
 - **users**: Employee information synced from Microsoft
+  - Includes `opt_out_token` (UUID for tokenized opt-out), `opted_in_at`, `opted_out_at`, `welcome_sent_at`
 - **departments**: Organization departments with enrollment status
+  - `is_active` controls whether department users are eligible for matching
+  - `enrollment_date` records when department was first enabled
 - **matching_rounds**: Monthly matching execution records
 - **pairings**: User pairings with meeting details
 - **meeting_feedback**: User feedback and ratings
@@ -325,10 +342,41 @@ kubectl get services
 
 ## Features
 
+### User Onboarding & Opt-Out Flow
+
+Coffee Roulette uses a frictionless onboarding system with tokenized opt-out:
+
+**Department Activation (Phased Rollout)**
+1. Admin enables a department via the dashboard
+2. All active users in that department are automatically opted-in
+3. Welcome emails are sent to all users with:
+   - Explanation of Coffee Roulette
+   - How the program works
+   - One-click opt-out link (no login required)
+4. Users have a 48-hour grace period before being included in matching
+
+**New User Sync**
+- When users are synced from Microsoft Graph API, new users in active departments are:
+  - Automatically opted-in
+  - Sent a welcome email
+  - Given a 48-hour grace period before matching
+
+**One-Click Opt-Out**
+- Each user has a unique `opt_out_token` (UUID)
+- Opt-out links work without authentication: `/api/public/opt-out/:token`
+- Users can opt back in via `/api/public/opt-in/:token`
+- Status can be checked via `/api/public/status/:token`
+
+**Participation Status**
+Users have three participation statuses:
+- **Eligible**: Opted-in, active user in an active department (can be matched)
+- **Opted-in Excluded**: Opted-in but department is inactive (won't be matched)
+- **Opted Out**: User has opted out of the program
+
 ### Matching Algorithm
 
 The pairing algorithm:
-1. Fetches eligible participants (opted-in, active, department enabled)
+1. Fetches eligible participants (opted-in, active, department enabled, past grace period)
 2. Checks recent pairings (last 3 rounds)
 3. Scores potential matches:
    - **-50 points** per recent pairing (penalty)
@@ -337,6 +385,8 @@ The pairing algorithm:
 4. Selects highest-scoring matches
 5. Handles odd numbers (one person sits out, prioritized next round)
 6. Assigns random icebreaker topics
+
+**Grace Period**: Users who opted in within the last 48 hours are excluded from matching, giving them time to opt-out if desired. This is configurable via `matching.grace_period_hours`.
 
 ### Automated Jobs
 
@@ -352,6 +402,35 @@ Configured via node-cron:
 - **Email**: AWS SES with HTML templates
 - **Microsoft Teams**: Webhook integration with adaptive cards
 - **Queue-based**: Reliable delivery with retry logic
+
+**Email Templates** (in `backend/src/templates/emails/`):
+- `welcome.js` - Welcome email for new participants with opt-out link
+- `pairingNotification.js` - Notification when matched with a coffee partner
+- `meetingReminder.js` - Reminders before scheduled meetings
+- `feedbackRequest.js` - Request for feedback after meetings
+
+### Template Management (Admin)
+
+Admins can customize email and Teams notification templates via the admin dashboard:
+
+**Features:**
+- **Monaco Code Editor**: Edit HTML/text emails and Teams Adaptive Card JSON with syntax highlighting
+- **Live Preview**: Preview templates with sample data before saving
+- **Variable Reference**: See available template variables with descriptions
+- **Restore Defaults**: One-click restore to original file-based templates
+
+**Accessing Template Editor:**
+1. Navigate to Admin Dashboard → Templates
+2. Select Email or Teams tab
+3. Click "Edit" on any template
+4. Modify content and preview
+5. Save changes or restore default
+
+**How It Works:**
+- Custom templates are stored in the `notification_templates` database table
+- When a template has a custom version (`is_active = true`), it's used instead of the file-based default
+- Restoring default sets `is_active = false`, falling back to the original file template
+- Templates use `${variableName}` syntax for variable interpolation
 
 ### Calendar Integration
 
@@ -369,9 +448,22 @@ matching.frequency=monthly
 matching.lookback_rounds=3
 matching.cross_department_weight=20
 matching.cross_seniority_weight=10
+matching.grace_period_hours=48
+matching.repeat_penalty=50
 calendar.auto_schedule=true
 calendar.meeting_duration_minutes=30
 ```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `matching.frequency` | monthly | How often matching runs |
+| `matching.lookback_rounds` | 3 | Number of previous rounds to check for repeat pairings |
+| `matching.cross_department_weight` | 20 | Bonus points for cross-department matches |
+| `matching.cross_seniority_weight` | 10 | Bonus points for cross-seniority matches |
+| `matching.repeat_penalty` | 50 | Penalty points per recent repeat pairing |
+| `matching.grace_period_hours` | 48 | Hours new opt-ins must wait before being eligible for matching |
+| `calendar.auto_schedule` | true | Automatically schedule meetings via Outlook |
+| `calendar.meeting_duration_minutes` | 30 | Default meeting duration |
 
 Admins can update these via the UI or API.
 
@@ -379,12 +471,13 @@ Admins can update these via the UI or API.
 
 - Microsoft OAuth 2.0 (no password storage)
 - JWT tokens with expiration
-- Role-based access control
-- Rate limiting
+- Role-based access control (super_admin, admin, viewer)
+- Rate limiting (100 requests per 15 minutes in production)
 - Helmet.js security headers
 - Input validation
 - SQL injection protection (Sequelize ORM)
-- Audit logging
+- Audit logging for admin actions
+- Tokenized opt-out links (UUID v4, unique per user, no auth required)
 
 ## Monitoring
 

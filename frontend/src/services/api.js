@@ -105,4 +105,14 @@ export const settingsAPI = {
   triggerJob: (jobKey) => api.post(`/admin/settings/jobs/${jobKey}/trigger`),
 };
 
+// Template APIs
+export const templateAPI = {
+  getTemplates: () => api.get('/admin/templates'),
+  getTemplate: (type, channel) => api.get(`/admin/templates/${type}/${channel}`),
+  updateTemplate: (type, channel, data) => api.put(`/admin/templates/${type}/${channel}`, data),
+  previewTemplate: (type, channel, data) => api.post(`/admin/templates/${type}/${channel}/preview`, data),
+  restoreDefault: (type, channel) => api.post(`/admin/templates/${type}/${channel}/restore`),
+  getVariables: (type) => api.get(`/admin/templates/variables/${type}`),
+};
+
 export default api;

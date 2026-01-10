@@ -225,12 +225,23 @@ const updateDepartment = async (req, res) => {
 
 /**
  * Enable department for Coffee Roulette (phased rollout)
+ * - Enables the department
+ * - Auto opts-in all users in the department
+ * - Sends welcome emails to all users
  */
 const enableDepartment = async (req, res) => {
   try {
     const { departmentId } = req.params;
+    const { v4: uuidv4 } = require('uuid');
+    const emailService = require('../services/emailService');
 
-    const department = await Department.findByPk(departmentId);
+    const department = await Department.findByPk(departmentId, {
+      include: [{
+        association: 'users',
+        where: { is_active: true },
+        required: false
+      }]
+    });
 
     if (!department) {
       return res.status(404).json({
@@ -246,12 +257,51 @@ const enableDepartment = async (req, res) => {
       });
     }
 
+    // Enable the department
     await department.update({
       is_active: true,
       enrollment_date: new Date()
     });
 
-    logger.info(`Admin ${req.user.id} enabled department ${departmentId}: ${department.name}`);
+    const users = department.users || [];
+    const now = new Date();
+    let optedInCount = 0;
+    let emailSentCount = 0;
+    const usersToEmail = [];
+
+    // Auto opt-in all active users in the department
+    for (const user of users) {
+      const updates = {
+        is_opted_in: true,
+        opted_in_at: now
+      };
+
+      // Generate opt_out_token if missing
+      if (!user.opt_out_token) {
+        updates.opt_out_token = uuidv4();
+      }
+
+      await user.update(updates);
+      optedInCount++;
+
+      // Add to email list if welcome email not already sent
+      if (!user.welcome_sent_at) {
+        // Refresh user to get updated opt_out_token
+        await user.reload();
+        usersToEmail.push(user);
+      }
+    }
+
+    // Send welcome emails in batch
+    if (usersToEmail.length > 0) {
+      const emailResults = await emailService.sendBulkWelcomeEmails(usersToEmail, department.name);
+      emailSentCount = emailResults.filter(r => r.success).length;
+    }
+
+    logger.info(`Admin ${req.user.id} enabled department ${departmentId}: ${department.name}`, {
+      usersOptedIn: optedInCount,
+      welcomeEmailsSent: emailSentCount
+    });
 
     res.json({
       message: `Department "${department.name}" has been enabled for Coffee Roulette`,
@@ -260,6 +310,11 @@ const enableDepartment = async (req, res) => {
         name: department.name,
         isActive: department.is_active,
         enrollmentDate: department.enrollment_date
+      },
+      enrollment: {
+        usersOptedIn: optedInCount,
+        welcomeEmailsSent: emailSentCount,
+        totalUsers: users.length
       }
     });
   } catch (error) {

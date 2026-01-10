@@ -1,10 +1,47 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const { NotificationTemplate } = require('../models');
+const { interpolateJson, prepareVariables } = require('../utils/templateInterpolation');
 
 class TeamsService {
   constructor() {
     this.webhookUrl = process.env.TEAMS_WEBHOOK_URL || '';
     this.isDevelopment = process.env.NODE_ENV !== 'production';
+  }
+
+  /**
+   * Get Teams card template from database or fall back to built-in card method
+   * @param {string} templateType - Type of template (pairing_notification, etc.)
+   * @param {object} variables - Variables to interpolate
+   * @param {function} fallbackCreator - Fallback method to create card if no DB template
+   * @returns {object} - Adaptive card object
+   */
+  async getTeamsCard(templateType, variables, fallbackCreator) {
+    try {
+      // Check for custom template in database
+      const dbTemplate = await NotificationTemplate.findOne({
+        where: {
+          template_type: templateType,
+          channel: 'teams',
+          is_active: true
+        }
+      });
+
+      if (dbTemplate && dbTemplate.json_content) {
+        // Use database template with variable interpolation
+        const preparedVars = prepareVariables(variables, templateType);
+        const cardTemplate = JSON.parse(dbTemplate.json_content);
+        return interpolateJson(cardTemplate, preparedVars);
+      }
+    } catch (error) {
+      logger.warn('Error loading Teams template from database, falling back to built-in:', {
+        templateType,
+        error: error.message
+      });
+    }
+
+    // Fall back to built-in card creator
+    return fallbackCreator(variables);
   }
 
   /**
@@ -279,7 +316,7 @@ class TeamsService {
    * Send pairing notification to Teams
    */
   async sendPairingNotification(pairing, user, partner, icebreakers) {
-    const card = this.createPairingCard({
+    const variables = {
       userName: user.first_name,
       partnerName: `${partner.first_name} ${partner.last_name}`,
       partnerEmail: partner.email,
@@ -287,7 +324,13 @@ class TeamsService {
       meetingDate: pairing.meeting_scheduled_at,
       icebreakers: icebreakers.map(ib => ib.topic),
       pairingId: pairing.id
-    });
+    };
+
+    const card = await this.getTeamsCard(
+      'pairing_notification',
+      variables,
+      (vars) => this.createPairingCard(vars)
+    );
 
     return this.sendAdaptiveCard(card);
   }
@@ -296,14 +339,20 @@ class TeamsService {
    * Send meeting reminder to Teams
    */
   async sendMeetingReminder(pairing, user, partner, icebreakers, daysUntil) {
-    const card = this.createReminderCard({
+    const variables = {
       userName: user.first_name,
       partnerName: `${partner.first_name} ${partner.last_name}`,
       meetingDate: pairing.meeting_scheduled_at,
       daysUntil,
       icebreakers: icebreakers.map(ib => ib.topic),
       pairingId: pairing.id
-    });
+    };
+
+    const card = await this.getTeamsCard(
+      'meeting_reminder',
+      variables,
+      (vars) => this.createReminderCard(vars)
+    );
 
     return this.sendAdaptiveCard(card);
   }
@@ -312,11 +361,17 @@ class TeamsService {
    * Send feedback request to Teams
    */
   async sendFeedbackRequest(pairing, user, partner) {
-    const card = this.createFeedbackCard({
+    const variables = {
       userName: user.first_name,
       partnerName: `${partner.first_name} ${partner.last_name}`,
       pairingId: pairing.id
-    });
+    };
+
+    const card = await this.getTeamsCard(
+      'feedback_request',
+      variables,
+      (vars) => this.createFeedbackCard(vars)
+    );
 
     return this.sendAdaptiveCard(card);
   }

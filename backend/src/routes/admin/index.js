@@ -8,5 +8,6 @@ router.use('/matching', require('./matching')); // Phase 3
 // router.use('/pairings', require('./pairings')); // Future
 router.use('/analytics', require('./analytics')); // Phase 7
 router.use('/settings', require('./settings')); // Phase 7
+router.use('/templates', require('./templates')); // Template management
 
 module.exports = router;

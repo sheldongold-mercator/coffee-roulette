@@ -64,9 +64,31 @@ module.exports = (sequelize) => {
     },
     is_opted_in: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true,
+      defaultValue: false,
       allowNull: false,
       comment: 'Whether user opted into Coffee Roulette'
+    },
+    opt_out_token: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      allowNull: true,
+      unique: true,
+      comment: 'Token for one-click opt-out from emails'
+    },
+    welcome_sent_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'When welcome email was sent to user'
+    },
+    opted_in_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'When user opted into Coffee Roulette'
+    },
+    opted_out_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'When user opted out of Coffee Roulette'
     },
     last_synced_at: {
       type: DataTypes.DATE,
@@ -83,7 +105,8 @@ module.exports = (sequelize) => {
       { fields: ['email'] },
       { fields: ['department_id'] },
       { fields: ['is_opted_in'] },
-      { fields: ['is_active'] }
+      { fields: ['is_active'] },
+      { fields: ['opt_out_token'] }
     ]
   });
 

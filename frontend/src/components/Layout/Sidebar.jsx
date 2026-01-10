@@ -9,6 +9,7 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon,
+  EnvelopeIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Departments', href: '/admin/departments', icon: BuildingOfficeIcon },
   { name: 'Matching', href: '/admin/matching', icon: HeartIcon },
   { name: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon },
+  { name: 'Templates', href: '/admin/templates', icon: EnvelopeIcon },
   { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
 ];
 
