@@ -19,30 +19,35 @@ const getDepartments = async (req, res) => {
       include: [
         {
           association: 'users',
-          attributes: [],
-          duplicating: false
+          attributes: ['id', 'is_active', 'is_opted_in']
         }
       ],
-      attributes: {
-        include: [
-          [Department.sequelize.fn('COUNT', Department.sequelize.col('users.id')), 'userCount']
-        ]
-      },
-      group: ['Department.id'],
       order: [['name', 'ASC']]
     });
 
     res.json({
-      data: departments.map(dept => ({
-        id: dept.id,
-        name: dept.name,
-        microsoftId: dept.microsoft_id,
-        isActive: dept.is_active,
-        enrollmentDate: dept.enrollment_date,
-        userCount: parseInt(dept.dataValues.userCount, 10) || 0,
-        createdAt: dept.created_at,
-        updatedAt: dept.updated_at
-      }))
+      data: departments.map(dept => {
+        const totalUsers = dept.users.length;
+        const activeUsers = dept.users.filter(u => u.is_active).length;
+        const optedInUsers = dept.users.filter(u => u.is_opted_in && u.is_active).length;
+        const participationRate = totalUsers > 0
+          ? Math.round((optedInUsers / totalUsers) * 100)
+          : 0;
+
+        return {
+          id: dept.id,
+          name: dept.name,
+          description: dept.microsoft_id ? 'Synced from Microsoft' : 'Manually added',
+          microsoftId: dept.microsoft_id,
+          isEnabled: dept.is_active,
+          enrollmentDate: dept.enrollment_date,
+          totalUsers,
+          activeUsers,
+          participationRate,
+          createdAt: dept.created_at,
+          updatedAt: dept.updated_at
+        };
+      })
     });
   } catch (error) {
     logger.error('Get departments error:', error);

@@ -85,6 +85,7 @@ const DepartmentCard = ({ department, onToggle }) => {
 const Departments = () => {
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
 
   const { data: departmentsData, isLoading } = useQuery(['departments', 'v2'], () =>
     departmentAPI.getDepartments()
@@ -106,11 +107,33 @@ const Departments = () => {
     }
   );
 
+  const createMutation = useMutation(
+    (name) => departmentAPI.createDepartment({ name, isActive: false }),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('departments');
+        toast.success('Department created successfully!');
+        setShowCreateModal(false);
+        setNewDeptName('');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'Failed to create department');
+      },
+    }
+  );
+
   const handleToggle = (department) => {
     toggleMutation.mutate({
       id: department.id,
       isEnabled: department.isEnabled,
     });
+  };
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    if (newDeptName.trim()) {
+      createMutation.mutate(newDeptName.trim());
+    }
   };
 
   // Handle both old format (departments) and new format (data)
@@ -244,6 +267,60 @@ const Departments = () => {
               <DepartmentCard department={department} onToggle={handleToggle} />
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Create Department Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4"
+          >
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Add New Department
+            </h2>
+            <form onSubmit={handleCreate}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Department Name
+                </label>
+                <input
+                  type="text"
+                  value={newDeptName}
+                  onChange={(e) => setNewDeptName(e.target.value)}
+                  placeholder="e.g., Engineering, Sales, HR"
+                  className="input w-full"
+                  autoFocus
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  The department will be created as disabled. You can enable it later.
+                </p>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setNewDeptName('');
+                  }}
+                  className="btn btn-secondary"
+                  disabled={createMutation.isLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={createMutation.isLoading || !newDeptName.trim()}
+                >
+                  {createMutation.isLoading ? 'Creating...' : 'Create Department'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>

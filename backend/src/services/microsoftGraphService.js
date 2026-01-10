@@ -135,12 +135,50 @@ class MicrosoftGraphService {
   }
 
   /**
+   * Get app-only access token using client credentials
+   * @returns {string} Access token
+   */
+  async getAppAccessToken() {
+    try {
+      const tenantId = process.env.MICROSOFT_TENANT_ID;
+      const clientId = process.env.MICROSOFT_CLIENT_ID;
+      const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+
+      if (!tenantId || !clientId || !clientSecret) {
+        throw new Error('Microsoft credentials not configured');
+      }
+
+      const response = await axios.post(
+        `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+        new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          scope: 'https://graph.microsoft.com/.default',
+          grant_type: 'client_credentials'
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      return response.data.access_token;
+    } catch (error) {
+      logger.error('Error getting app access token:', error.response?.data || error);
+      throw error;
+    }
+  }
+
+  /**
    * Get all users in the organization (admin only)
-   * @param {string} accessToken - Microsoft access token with appropriate permissions
+   * Uses app-only authentication with client credentials
    * @returns {Array} List of users
    */
-  async getAllUsers(accessToken) {
+  async getAllUsers() {
     try {
+      const accessToken = await this.getAppAccessToken();
+
       const response = await axios.get(`${this.graphApiUrl}/users`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
@@ -153,7 +191,7 @@ class MicrosoftGraphService {
 
       return response.data.value;
     } catch (error) {
-      logger.error('Error fetching all users:', error);
+      logger.error('Error fetching all users:', error.response?.data || error);
       throw error;
     }
   }

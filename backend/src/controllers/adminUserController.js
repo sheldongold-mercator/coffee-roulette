@@ -241,29 +241,102 @@ const updateUser = async (req, res) => {
  */
 const syncUsers = async (req, res) => {
   try {
-    // Note: In production, you'd use a service account token with appropriate permissions
-    // For now, we'll return a placeholder response
-    // The actual implementation would use microsoftGraphService.getAllUsers()
-
     logger.info(`Admin ${req.user.id} initiated user sync`);
 
-    res.json({
-      message: 'User sync initiated',
-      note: 'This feature requires Microsoft Graph API service account configuration'
-    });
+    // Get all users from Microsoft Graph API
+    const msUsers = await microsoftGraphService.getAllUsers();
+    logger.info(`Fetched ${msUsers.length} users from Microsoft Graph API`);
 
-    // TODO: Implement actual sync logic:
-    // 1. Get all users from Microsoft Graph API
-    // 2. For each user, find or create in database
-    // 3. Update user information
-    // 4. Find or create departments
-    // 5. Return sync statistics
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors = [];
+
+    // Process each user
+    for (const msUser of msUsers) {
+      try {
+        // Skip users without email
+        const email = msUser.mail || msUser.userPrincipalName;
+        if (!email) {
+          skipped++;
+          continue;
+        }
+
+        // Find or create department
+        let department = null;
+        if (msUser.department) {
+          [department] = await Department.findOrCreate({
+            where: { name: msUser.department },
+            defaults: {
+              name: msUser.department,
+              is_active: true
+            }
+          });
+        }
+
+        // Find or create user
+        const [user, isCreated] = await User.findOrCreate({
+          where: { microsoft_id: msUser.id },
+          defaults: {
+            microsoft_id: msUser.id,
+            email: email,
+            first_name: msUser.givenName || msUser.displayName?.split(' ')[0] || 'Unknown',
+            last_name: msUser.surname || msUser.displayName?.split(' ').slice(1).join(' ') || 'User',
+            department_id: department?.id,
+            role: msUser.jobTitle,
+            seniority_level: 'mid', // Default, can be updated manually
+            is_active: true,
+            is_opted_in: false, // Users must opt-in manually
+            last_synced_at: new Date()
+          }
+        });
+
+        if (isCreated) {
+          created++;
+          logger.info(`Created new user: ${email}`);
+        } else {
+          // Update existing user
+          await user.update({
+            email: email,
+            first_name: msUser.givenName || user.first_name,
+            last_name: msUser.surname || user.last_name,
+            department_id: department?.id || user.department_id,
+            role: msUser.jobTitle || user.role,
+            last_synced_at: new Date()
+          });
+          updated++;
+          logger.info(`Updated existing user: ${email}`);
+        }
+      } catch (userError) {
+        logger.error(`Error processing user ${msUser.id}:`, userError);
+        errors.push({
+          userId: msUser.id,
+          email: msUser.mail || msUser.userPrincipalName,
+          error: userError.message
+        });
+      }
+    }
+
+    logger.info(`User sync completed: ${created} created, ${updated} updated, ${skipped} skipped, ${errors.length} errors`);
+
+    res.json({
+      success: true,
+      message: 'User sync completed',
+      stats: {
+        total: msUsers.length,
+        created,
+        updated,
+        skipped,
+        errors: errors.length
+      },
+      errors: errors.length > 0 ? errors : undefined
+    });
 
   } catch (error) {
     logger.error('Sync users error:', error);
     res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to sync users'
+      message: error.message || 'Failed to sync users'
     });
   }
 };
