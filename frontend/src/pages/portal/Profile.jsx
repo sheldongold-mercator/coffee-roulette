@@ -17,6 +17,7 @@ const seniorityLevels = [
   { value: 'mid', label: 'Mid-Level', description: '2-5 years experience' },
   { value: 'senior', label: 'Senior', description: '5-8 years experience' },
   { value: 'lead', label: 'Lead', description: '8+ years, leadership role' },
+  { value: 'head', label: 'Head', description: 'Head of department/function' },
   { value: 'executive', label: 'Executive', description: 'Director and above' },
 ];
 

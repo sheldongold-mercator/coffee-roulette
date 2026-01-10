@@ -52,7 +52,7 @@ module.exports = (sequelize) => {
       comment: 'Job title/role'
     },
     seniority_level: {
-      type: DataTypes.ENUM('junior', 'mid', 'senior', 'lead', 'executive'),
+      type: DataTypes.ENUM('junior', 'mid', 'senior', 'lead', 'head', 'executive'),
       defaultValue: 'mid',
       allowNull: true
     },

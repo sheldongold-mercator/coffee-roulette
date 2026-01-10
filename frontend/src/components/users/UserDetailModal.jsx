@@ -19,6 +19,7 @@ const seniorityLevels = [
   { value: 'mid', label: 'Mid-Level' },
   { value: 'senior', label: 'Senior' },
   { value: 'lead', label: 'Lead' },
+  { value: 'head', label: 'Head' },
   { value: 'executive', label: 'Executive' },
 ];
 

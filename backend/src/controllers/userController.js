@@ -48,7 +48,7 @@ const updateProfile = async (req, res) => {
     // Users can only update limited fields themselves
     const allowedUpdates = {};
 
-    if (seniorityLevel && ['junior', 'mid', 'senior', 'lead', 'executive'].includes(seniorityLevel)) {
+    if (seniorityLevel && ['junior', 'mid', 'senior', 'lead', 'head', 'executive'].includes(seniorityLevel)) {
       allowedUpdates.seniority_level = seniorityLevel;
     }
 

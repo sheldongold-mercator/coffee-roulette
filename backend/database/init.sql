@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_name VARCHAR(100) NOT NULL,
   department_id INT,
   role VARCHAR(100) COMMENT 'Job title/role',
-  seniority_level ENUM('junior', 'mid', 'senior', 'lead', 'executive') DEFAULT 'mid',
+  seniority_level ENUM('junior', 'mid', 'senior', 'lead', 'head', 'executive') DEFAULT 'mid',
   is_active BOOLEAN DEFAULT TRUE COMMENT 'Whether user account is active',
   is_opted_in BOOLEAN DEFAULT TRUE COMMENT 'Whether user opted into Coffee Roulette',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

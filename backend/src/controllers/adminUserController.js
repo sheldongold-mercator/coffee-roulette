@@ -288,7 +288,7 @@ const updateUser = async (req, res) => {
     if (lastName) updates.last_name = lastName;
     if (departmentId !== undefined) updates.department_id = departmentId;
     if (role !== undefined) updates.role = role;
-    if (seniorityLevel && ['junior', 'mid', 'senior', 'lead', 'executive'].includes(seniorityLevel)) {
+    if (seniorityLevel && ['junior', 'mid', 'senior', 'lead', 'head', 'executive'].includes(seniorityLevel)) {
       updates.seniority_level = seniorityLevel;
     }
     if (isActive !== undefined) updates.is_active = isActive;
