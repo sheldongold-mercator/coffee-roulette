@@ -33,7 +33,7 @@ const getDepartments = async (req, res) => {
     });
 
     res.json({
-      departments: departments.map(dept => ({
+      data: departments.map(dept => ({
         id: dept.id,
         name: dept.name,
         microsoftId: dept.microsoft_id,

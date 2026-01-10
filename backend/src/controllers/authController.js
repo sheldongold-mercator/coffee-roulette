@@ -53,28 +53,44 @@ const loginWithMicrosoft = async (req, res) => {
         });
       }
 
-      user = await User.create({
-        microsoft_id: msProfile.id,
-        email: msProfile.email,
-        first_name: msProfile.firstName || msProfile.displayName?.split(' ')[0] || 'Unknown',
-        last_name: msProfile.lastName || msProfile.displayName?.split(' ').slice(1).join(' ') || 'User',
-        department_id: department?.id,
-        role: msProfile.jobTitle,
-        seniority_level: 'mid', // Default seniority
-        is_active: true,
-        is_opted_in: true,
-        last_synced_at: new Date()
-      });
+      try {
+        user = await User.create({
+          microsoft_id: msProfile.id,
+          email: msProfile.email,
+          first_name: msProfile.firstName || msProfile.displayName?.split(' ')[0] || 'Unknown',
+          last_name: msProfile.lastName || msProfile.displayName?.split(' ').slice(1).join(' ') || 'User',
+          department_id: department?.id,
+          role: msProfile.jobTitle,
+          seniority_level: 'mid', // Default seniority
+          is_active: true,
+          is_opted_in: true,
+          last_synced_at: new Date()
+        });
 
-      // Reload with associations
-      await user.reload({
-        include: [
-          { association: 'department' },
-          { association: 'adminRole' }
-        ]
-      });
+        // Reload with associations
+        await user.reload({
+          include: [
+            { association: 'department' },
+            { association: 'adminRole' }
+          ]
+        });
 
-      logger.info(`User created successfully: ${user.email} (ID: ${user.id})`);
+        logger.info(`User created successfully: ${user.email} (ID: ${user.id})`);
+      } catch (createError) {
+        // If user was created by a concurrent request, fetch them
+        if (createError.name === 'SequelizeUniqueConstraintError') {
+          logger.info(`User already exists (concurrent creation), fetching: ${msProfile.email}`);
+          user = await User.findOne({
+            where: { microsoft_id: msProfile.id },
+            include: [
+              { association: 'department' },
+              { association: 'adminRole' }
+            ]
+          });
+        } else {
+          throw createError; // Re-throw if it's not a duplicate key error
+        }
+      }
     } else {
       // Update existing user's last sync time
       user.last_synced_at = new Date();

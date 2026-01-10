@@ -65,7 +65,7 @@ const getUsers = async (req, res) => {
     });
 
     res.json({
-      users: users.rows.map(user => ({
+      data: users.rows.map(user => ({
         id: user.id,
         email: user.email,
         firstName: user.first_name,
@@ -299,18 +299,20 @@ const getUserStats = async (req, res) => {
     });
 
     res.json({
-      overall: {
-        total: parseInt(stats[0].total, 10) || 0,
-        active: parseInt(stats[0].active, 10) || 0,
-        optedIn: parseInt(stats[0].optedIn, 10) || 0,
-        activeAndOptedIn: parseInt(stats[0].activeAndOptedIn, 10) || 0
-      },
-      byDepartment: departmentStats.map(stat => ({
-        departmentId: stat.department_id,
-        departmentName: stat.department ? stat.department.name : 'No Department',
-        isDepartmentActive: stat.department ? stat.department.is_active : false,
-        userCount: parseInt(stat.dataValues.userCount, 10)
-      }))
+      data: {
+        overall: {
+          total: parseInt(stats[0].total, 10) || 0,
+          active: parseInt(stats[0].active, 10) || 0,
+          optedIn: parseInt(stats[0].optedIn, 10) || 0,
+          activeAndOptedIn: parseInt(stats[0].activeAndOptedIn, 10) || 0
+        },
+        byDepartment: departmentStats.map(stat => ({
+          departmentId: stat.department_id,
+          departmentName: stat.department ? stat.department.name : 'No Department',
+          isDepartmentActive: stat.department ? stat.department.is_active : false,
+          userCount: parseInt(stat.dataValues.userCount, 10)
+        }))
+      }
     });
   } catch (error) {
     logger.error('Get user stats error:', error);

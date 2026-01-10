@@ -30,9 +30,9 @@ const getOverview = async (req, res) => {
   try {
     logger.info(`Admin ${req.user.id} requested analytics overview`);
 
-    const stats = await analyticsService.getOverviewStats();
+    const data = await analyticsService.getOverviewStats();
 
-    res.json({ stats });
+    res.json({ data });
   } catch (error) {
     logger.error('Get analytics overview error:', error);
     res.status(500).json({
@@ -49,9 +49,9 @@ const getParticipationTrends = async (req, res) => {
   try {
     const { months = 6 } = req.query;
 
-    const trends = await analyticsService.getParticipationTrends(parseInt(months, 10));
+    const data = await analyticsService.getParticipationTrends(parseInt(months, 10));
 
-    res.json({ trends });
+    res.json({ data });
   } catch (error) {
     logger.error('Get participation trends error:', error);
     res.status(500).json({
@@ -68,9 +68,9 @@ const getCompletionTrends = async (req, res) => {
   try {
     const { months = 6 } = req.query;
 
-    const trends = await analyticsService.getCompletionTrends(parseInt(months, 10));
+    const data = await analyticsService.getCompletionTrends(parseInt(months, 10));
 
-    res.json({ trends });
+    res.json({ data });
   } catch (error) {
     logger.error('Get completion trends error:', error);
     res.status(500).json({
@@ -85,9 +85,9 @@ const getCompletionTrends = async (req, res) => {
  */
 const getDepartmentStats = async (req, res) => {
   try {
-    const stats = await analyticsService.getDepartmentStats();
+    const data = await analyticsService.getDepartmentStats();
 
-    res.json({ departments: stats });
+    res.json({ data });
   } catch (error) {
     logger.error('Get department stats error:', error);
     res.status(500).json({
@@ -102,9 +102,9 @@ const getDepartmentStats = async (req, res) => {
  */
 const getFeedbackStats = async (req, res) => {
   try {
-    const stats = await analyticsService.getFeedbackStats();
+    const data = await analyticsService.getFeedbackStats();
 
-    res.json({ feedback: stats });
+    res.json({ data });
   } catch (error) {
     logger.error('Get feedback stats error:', error);
     res.status(500).json({
@@ -119,9 +119,9 @@ const getFeedbackStats = async (req, res) => {
  */
 const getCrossDepartmentStats = async (req, res) => {
   try {
-    const stats = await analyticsService.getCrossDepartmentStats();
+    const data = await analyticsService.getCrossDepartmentStats();
 
-    res.json({ crossDepartment: stats });
+    res.json({ data });
   } catch (error) {
     logger.error('Get cross-department stats error:', error);
     res.status(500).json({
@@ -138,9 +138,9 @@ const getEngagementLeaderboard = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
-    const leaderboard = await analyticsService.getEngagementLeaderboard(parseInt(limit, 10));
+    const data = await analyticsService.getEngagementLeaderboard(parseInt(limit, 10));
 
-    res.json({ leaderboard });
+    res.json({ data });
   } catch (error) {
     logger.error('Get engagement leaderboard error:', error);
     res.status(500).json({
@@ -157,9 +157,9 @@ const getRecentActivity = async (req, res) => {
   try {
     const { limit = 20 } = req.query;
 
-    const activities = await analyticsService.getRecentActivity(parseInt(limit, 10));
+    const data = await analyticsService.getRecentActivity(parseInt(limit, 10));
 
-    res.json({ activities });
+    res.json({ data });
   } catch (error) {
     logger.error('Get recent activity error:', error);
     res.status(500).json({

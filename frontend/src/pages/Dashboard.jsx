@@ -71,28 +71,33 @@ const StatCard = ({ title, value, icon: Icon, trend, loading }) => {
 
 const Dashboard = () => {
   const { data: overview, isLoading: overviewLoading } = useQuery(
-    'analytics-overview',
+    ['analytics-overview', 'v2'],
     () => analyticsAPI.getOverview()
   );
 
   const { data: userStats, isLoading: userStatsLoading } = useQuery(
-    'user-stats',
+    ['user-stats', 'v2'],
     () => userAPI.getUserStats()
   );
 
   const { data: participationTrends, isLoading: trendsLoading } = useQuery(
-    'participation-trends',
+    ['participation-trends', 'v2'],
     () => analyticsAPI.getParticipationTrends(6)
   );
 
   const { data: recentActivity, isLoading: activityLoading } = useQuery(
-    'recent-activity',
+    ['recent-activity', 'v2'],
     () => analyticsAPI.getRecentActivity(10)
   );
 
   const stats = overview?.data || {};
   const trends = participationTrends?.data || [];
-  const activities = recentActivity?.data || [];
+  // Handle both old format (activities) and new format (data)
+  const activities = Array.isArray(recentActivity?.data)
+    ? recentActivity.data
+    : Array.isArray(recentActivity?.activities)
+    ? recentActivity.activities
+    : [];
 
   return (
     <div className="space-y-8">

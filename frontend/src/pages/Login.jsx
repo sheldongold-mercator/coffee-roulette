@@ -15,12 +15,20 @@ const Login = () => {
   }, [isAuthenticated, navigate]);
 
   const handleLogin = async () => {
-    const result = await login();
-    if (result.success) {
-      toast.success('Successfully logged in!');
-      navigate('/admin/dashboard');
-    } else {
-      toast.error(result.error || 'Failed to login');
+    console.log('🔘 Login button clicked!');
+    try {
+      console.log('🔘 Calling login function...');
+      const result = await login();
+      console.log('🔘 Login result:', result);
+      if (result.success) {
+        toast.success('Successfully logged in!');
+        navigate('/admin/dashboard');
+      } else {
+        toast.error(result.error || 'Failed to login');
+      }
+    } catch (err) {
+      console.error('🔘 Login button error:', err);
+      toast.error('Failed to login');
     }
   };
 

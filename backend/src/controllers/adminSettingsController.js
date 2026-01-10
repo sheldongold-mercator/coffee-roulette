@@ -22,7 +22,7 @@ const getAllSettings = async (req, res) => {
       };
     });
 
-    res.json({ settings: settingsObj });
+    res.json({ data: settingsObj });
   } catch (error) {
     logger.error('Get all settings error:', error);
     res.status(500).json({
@@ -56,7 +56,7 @@ const getSettingsByCategory = async (req, res) => {
       };
     });
 
-    res.json({ category, settings: settingsObj });
+    res.json({ data: settingsObj, category });
   } catch (error) {
     logger.error('Get settings by category error:', error);
     res.status(500).json({
@@ -172,7 +172,7 @@ const getJobStatus = async (req, res) => {
   try {
     const status = jobOrchestrator.getStatus();
 
-    res.json({ jobs: status });
+    res.json({ data: status });
   } catch (error) {
     logger.error('Get job status error:', error);
     res.status(500).json({

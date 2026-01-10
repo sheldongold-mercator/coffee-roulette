@@ -40,7 +40,7 @@ api.interceptors.response.use(
 // Authentication APIs
 export const authAPI = {
   login: (microsoftToken) =>
-    api.post('/auth/login', { microsoftToken }),
+    api.post('/auth/login', { accessToken: microsoftToken }),
   getCurrentUser: () => api.get('/auth/me'),
 };
 

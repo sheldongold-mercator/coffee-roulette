@@ -16,16 +16,16 @@ const Matching = () => {
   const queryClient = useQueryClient();
   const [showPreview, setShowPreview] = useState(false);
 
-  const { data: roundsData, isLoading } = useQuery('matching-rounds', () =>
+  const { data: roundsData, isLoading } = useQuery(['matching-rounds', 'v2'], () =>
     matchingAPI.getRounds({ limit: 10 })
   );
 
-  const { data: eligibleData } = useQuery('matching-eligible', () =>
+  const { data: eligibleData } = useQuery(['matching-eligible', 'v2'], () =>
     matchingAPI.getEligibleCount()
   );
 
   const { data: previewData, isLoading: previewLoading } = useQuery(
-    'matching-preview',
+    ['matching-preview', 'v2'],
     () => matchingAPI.previewMatching(),
     { enabled: showPreview }
   );
@@ -51,9 +51,14 @@ const Matching = () => {
     }
   };
 
-  const rounds = roundsData?.data?.rounds || [];
+  // Handle both old and new API formats
+  const rounds = Array.isArray(roundsData?.data)
+    ? roundsData.data
+    : Array.isArray(roundsData?.data?.rounds)
+    ? roundsData.data.rounds
+    : [];
   const eligibleCount = eligibleData?.data?.count || 0;
-  const preview = previewData?.data || null;
+  const preview = previewData?.data?.preview || previewData?.preview || null;
 
   return (
     <div className="space-y-6">

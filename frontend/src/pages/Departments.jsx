@@ -86,7 +86,7 @@ const Departments = () => {
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const { data: departmentsData, isLoading } = useQuery('departments', () =>
+  const { data: departmentsData, isLoading } = useQuery(['departments', 'v2'], () =>
     departmentAPI.getDepartments()
   );
 
@@ -113,7 +113,12 @@ const Departments = () => {
     });
   };
 
-  const departments = departmentsData?.data || [];
+  // Handle both old format (departments) and new format (data)
+  const departments = Array.isArray(departmentsData?.data)
+    ? departmentsData.data
+    : Array.isArray(departmentsData?.departments)
+    ? departmentsData.departments
+    : [];
 
   return (
     <div className="space-y-6">

@@ -110,11 +110,11 @@ const Settings = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('matching');
 
-  const { data: settingsData, isLoading } = useQuery('settings', () =>
+  const { data: settingsData, isLoading } = useQuery(['settings', 'v2'], () =>
     settingsAPI.getAllSettings()
   );
 
-  const { data: jobStatus } = useQuery('job-status', () =>
+  const { data: jobStatus } = useQuery(['job-status', 'v2'], () =>
     settingsAPI.getJobStatus()
   );
 
@@ -153,8 +153,19 @@ const Settings = () => {
     }
   };
 
-  const settings = settingsData?.data || [];
-  const jobs = jobStatus?.data || [];
+  // Handle settings data - convert object to array
+  const settingsObj = settingsData?.data || settingsData?.settings || {};
+  const settings = Object.entries(settingsObj).map(([key, value]) => ({
+    key,
+    category: key.split('.')[0], // Extract category from key (e.g., "matching.weight" -> "matching")
+    ...value
+  }));
+
+  const jobs = Array.isArray(jobStatus?.data)
+    ? jobStatus.data
+    : Array.isArray(jobStatus?.jobs)
+    ? jobStatus.jobs
+    : [];
 
   // Group settings by category
   const groupedSettings = settings.reduce((acc, setting) => {

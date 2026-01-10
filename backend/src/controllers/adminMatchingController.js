@@ -32,7 +32,7 @@ const getMatchingRounds = async (req, res) => {
     });
 
     res.json({
-      rounds: rounds.rows.map(round => ({
+      data: rounds.rows.map(round => ({
         id: round.id,
         name: round.name,
         scheduledDate: round.scheduled_date,
@@ -259,7 +259,7 @@ const getMatchingSettings = async (req, res) => {
       };
     });
 
-    res.json({ settings: settingsObj });
+    res.json({ data: settingsObj });
   } catch (error) {
     logger.error('Get matching settings error:', error);
     res.status(500).json({
@@ -326,15 +326,17 @@ const getEligibleParticipantsCount = async (req, res) => {
     const participants = await matchingService.getEligibleParticipants();
 
     res.json({
-      count: participants.length,
-      participants: participants.map(user => ({
-        id: user.id,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        email: user.email,
-        department: user.department ? user.department.name : null,
-        seniorityLevel: user.seniority_level
-      }))
+      data: {
+        count: participants.length,
+        participants: participants.map(user => ({
+          id: user.id,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
+          department: user.department ? user.department.name : null,
+          seniorityLevel: user.seniority_level
+        }))
+      }
     });
   } catch (error) {
     logger.error('Get eligible participants error:', error);

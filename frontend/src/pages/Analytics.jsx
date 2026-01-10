@@ -27,22 +27,22 @@ const COLORS = ['#0284c7', '#d946ef', '#10b981', '#f59e0b', '#ef4444'];
 
 const Analytics = () => {
   const { data: departmentStats, isLoading: deptLoading } = useQuery(
-    'department-stats',
+    ['department-stats', 'v2'],
     () => analyticsAPI.getDepartmentStats()
   );
 
   const { data: feedbackStats, isLoading: feedbackLoading } = useQuery(
-    'feedback-stats',
+    ['feedback-stats', 'v2'],
     () => analyticsAPI.getFeedbackStats()
   );
 
   const { data: crossDeptStats, isLoading: crossLoading } = useQuery(
-    'cross-department-stats',
+    ['cross-department-stats', 'v2'],
     () => analyticsAPI.getCrossDepartmentStats()
   );
 
   const { data: leaderboard, isLoading: leaderboardLoading } = useQuery(
-    'engagement-leaderboard',
+    ['engagement-leaderboard', 'v2'],
     () => analyticsAPI.getEngagementLeaderboard(10)
   );
 
@@ -84,10 +84,19 @@ const Analytics = () => {
     }
   };
 
-  const deptData = departmentStats?.data || [];
-  const feedbackData = feedbackStats?.data || {};
-  const crossDept = crossDeptStats?.data || {};
-  const leaders = leaderboard?.data || [];
+  // Handle both old and new API formats
+  const deptData = Array.isArray(departmentStats?.data)
+    ? departmentStats.data
+    : Array.isArray(departmentStats?.departments)
+    ? departmentStats.departments
+    : [];
+  const feedbackData = feedbackStats?.data || feedbackStats?.feedback || {};
+  const crossDept = crossDeptStats?.data || crossDeptStats?.crossDepartment || {};
+  const leaders = Array.isArray(leaderboard?.data)
+    ? leaderboard.data
+    : Array.isArray(leaderboard?.leaderboard)
+    ? leaderboard.leaderboard
+    : [];
 
   return (
     <div className="space-y-6">

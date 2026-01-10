@@ -21,7 +21,7 @@ const Users = () => {
   const limit = 20;
 
   const { data: usersData, isLoading, refetch } = useQuery(
-    ['users', { search, ...filters, page, limit }],
+    ['users', 'v2', { search, ...filters, page, limit }],
     () => userAPI.getUsers({ search, ...filters, page, limit })
   );
 
@@ -60,8 +60,15 @@ const Users = () => {
     }
   };
 
-  const users = usersData?.data?.users || [];
-  const pagination = usersData?.data?.pagination || {};
+  // Handle both old and new API formats
+  const users = Array.isArray(usersData?.data)
+    ? usersData.data
+    : Array.isArray(usersData?.data?.users)
+    ? usersData.data.users
+    : Array.isArray(usersData?.users)
+    ? usersData.users
+    : [];
+  const pagination = usersData?.pagination || {};
 
   return (
     <div className="space-y-6">
