@@ -163,6 +163,7 @@ const Users = () => {
           >
             <option value="">All Participation</option>
             <option value="eligible">Eligible</option>
+            <option value="in_grace_period">In Grace Period</option>
             <option value="opted_in_excluded">Opted In (Dept Excluded)</option>
             <option value="opted_out">Opted Out</option>
           </select>
@@ -230,6 +231,8 @@ const Users = () => {
                         className={`badge ${
                           user.participationStatus === 'eligible'
                             ? 'badge-success'
+                            : user.participationStatus === 'in_grace_period'
+                            ? 'badge-info'
                             : user.participationStatus === 'opted_in_excluded'
                             ? 'badge-warning'
                             : 'badge-error'
@@ -237,6 +240,8 @@ const Users = () => {
                       >
                         {user.participationStatus === 'eligible'
                           ? 'Eligible'
+                          : user.participationStatus === 'in_grace_period'
+                          ? 'Grace Period'
                           : user.participationStatus === 'opted_in_excluded'
                           ? 'Dept Excluded'
                           : 'Opted Out'}

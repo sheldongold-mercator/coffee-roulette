@@ -1,4 +1,4 @@
-const { User, Department, Pairing, MeetingFeedback, MatchingRound, NotificationQueue } = require('../models');
+const { User, Department, Pairing, MeetingFeedback, MatchingRound, NotificationQueue, SystemSetting } = require('../models');
 const { Op } = require('sequelize');
 const microsoftGraphService = require('../services/microsoftGraphService');
 const logger = require('../utils/logger');
@@ -48,6 +48,13 @@ const getUsers = async (req, res) => {
 
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
+    // Get grace period setting
+    const gracePeriodSetting = await SystemSetting.findOne({
+      where: { setting_key: 'matching.grace_period_hours' }
+    });
+    const gracePeriodHours = gracePeriodSetting ? parseInt(gracePeriodSetting.setting_value, 10) : 48;
+    const gracePeriodCutoff = new Date(Date.now() - gracePeriodHours * 60 * 60 * 1000);
+
     const users = await User.findAndCountAll({
       where,
       include: [
@@ -65,10 +72,14 @@ const getUsers = async (req, res) => {
       offset
     });
 
-    // Helper to compute participation status
+    // Helper to compute participation status (matches matchingService logic)
     const getParticipationStatus = (user) => {
       if (!user.is_opted_in) return 'opted_out';
       if (!user.department || !user.department.is_active) return 'opted_in_excluded';
+      // Check grace period - user must have opted in before cutoff OR have no opted_in_at
+      if (user.opted_in_at && new Date(user.opted_in_at) > gracePeriodCutoff) {
+        return 'in_grace_period';
+      }
       return 'eligible';
     };
 
