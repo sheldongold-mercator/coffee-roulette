@@ -167,7 +167,7 @@ const getUserById = async (req, res) => {
         {
           model: MatchingRound,
           as: 'matchingRound',
-          attributes: ['id', 'name', 'start_date', 'end_date']
+          attributes: ['id', 'name', 'scheduled_date']
         },
         {
           model: MeetingFeedback,
@@ -201,8 +201,7 @@ const getUserById = async (req, res) => {
         round: pairing.matchingRound ? {
           id: pairing.matchingRound.id,
           name: pairing.matchingRound.name,
-          startDate: pairing.matchingRound.start_date,
-          endDate: pairing.matchingRound.end_date
+          scheduledDate: pairing.matchingRound.scheduled_date
         } : null,
         feedback: userFeedback ? {
           rating: userFeedback.rating,
