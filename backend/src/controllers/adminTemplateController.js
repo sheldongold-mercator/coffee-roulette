@@ -16,19 +16,30 @@ const templateTypeToFile = {
 
 /**
  * Get default template content from file
+ * Returns raw template source with ${variable} placeholders for editor display
  */
 const getDefaultTemplate = (type, channel) => {
   try {
     if (channel === 'email') {
       const templatePath = path.join(__dirname, '..', 'templates', 'emails', `${templateTypeToFile[type]}.js`);
-      const templateFn = require(templatePath);
 
-      // Get sample data for this template type
+      // Clear require cache to get fresh module
+      delete require.cache[require.resolve(templatePath)];
+      const templateModule = require(templatePath);
+
+      // Check if template exports rawTemplates (preferred for editor display)
+      if (templateModule.rawTemplates) {
+        return {
+          subject: templateModule.rawTemplates.subject || '',
+          html_content: templateModule.rawTemplates.html || '',
+          text_content: templateModule.rawTemplates.text || ''
+        };
+      }
+
+      // Fallback: execute template function with sample data (legacy behavior)
       const sample = sampleData[type] || {};
       const prepared = prepareVariables(sample, type);
-
-      // Execute template function to get content
-      const result = templateFn(prepared);
+      const result = templateModule(prepared);
 
       return {
         subject: result.subject || '',
