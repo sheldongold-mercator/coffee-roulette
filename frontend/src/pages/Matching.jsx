@@ -11,10 +11,12 @@ import {
 import { matchingAPI } from '../services/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import MatchingRoundModal from '../components/matching/MatchingRoundModal';
 
 const Matching = () => {
   const queryClient = useQueryClient();
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedRoundId, setSelectedRoundId] = useState(null);
 
   const { data: roundsData, isLoading } = useQuery(['matching-rounds', 'v2'], () =>
     matchingAPI.getRounds({ limit: 10 })
@@ -279,7 +281,10 @@ const Matching = () => {
                       <span className="badge badge-success">Completed</span>
                     </td>
                     <td>
-                      <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                      <button
+                        onClick={() => setSelectedRoundId(round.id)}
+                        className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                      >
                         View Details
                       </button>
                     </td>
@@ -290,6 +295,14 @@ const Matching = () => {
           </table>
         </div>
       </motion.div>
+
+      {/* Round Detail Modal */}
+      {selectedRoundId && (
+        <MatchingRoundModal
+          roundId={selectedRoundId}
+          onClose={() => setSelectedRoundId(null)}
+        />
+      )}
     </div>
   );
 };

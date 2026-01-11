@@ -129,7 +129,7 @@ class MatchingService {
   /**
    * Run matching algorithm to create pairings
    */
-  async runMatchingAlgorithm(roundId, previewOnly = false) {
+  async runMatchingAlgorithm(roundId, previewOnly = false, transaction = null) {
     try {
       logger.info(`${previewOnly ? 'Previewing' : 'Running'} matching algorithm for round ${roundId}`);
 
@@ -214,16 +214,16 @@ class MatchingService {
 
       // 6. Save pairings to database if not preview
       if (!previewOnly) {
-        const savedPairings = await this.savePairings(roundId, pairings);
+        const savedPairings = await this.savePairings(roundId, pairings, transaction);
 
         // 7. Assign icebreaker topics
-        await this.assignIcebreakers(savedPairings);
+        await this.assignIcebreakers(savedPairings, 3, transaction);
 
         // 8. Schedule meetings (if auto-scheduling enabled)
         await this.scheduleMeetingsForPairings(savedPairings);
 
         // 9. Queue notifications for all pairings
-        await this.queueNotificationsForPairings(savedPairings);
+        await this.queueNotificationsForPairings(savedPairings, transaction);
 
         return {
           pairings: savedPairings,
@@ -278,7 +278,7 @@ class MatchingService {
   /**
    * Save pairings to database
    */
-  async savePairings(roundId, pairings) {
+  async savePairings(roundId, pairings, transaction = null) {
     const savedPairings = [];
 
     for (const pairing of pairings) {
@@ -287,7 +287,7 @@ class MatchingService {
         user1_id: pairing.user1_id,
         user2_id: pairing.user2_id,
         status: 'pending'
-      });
+      }, { transaction });
 
       savedPairings.push(saved);
     }
@@ -299,11 +299,12 @@ class MatchingService {
   /**
    * Assign random icebreaker topics to pairings
    */
-  async assignIcebreakers(pairings, count = 3) {
+  async assignIcebreakers(pairings, count = 3, transaction = null) {
     try {
       // Get all active icebreaker topics
       const allIcebreakers = await IcebreakerTopic.findAll({
-        where: { is_active: true }
+        where: { is_active: true },
+        transaction
       });
 
       if (allIcebreakers.length === 0) {
@@ -319,7 +320,7 @@ class MatchingService {
           await PairingIcebreaker.create({
             pairing_id: pairing.id,
             icebreaker_id: icebreaker.id
-          });
+          }, { transaction });
         }
       }
 
@@ -455,7 +456,7 @@ class MatchingService {
       logger.info(`Created matching round ${round.id}: ${name}`);
 
       // Run matching algorithm
-      const result = await this.runMatchingAlgorithm(round.id, false);
+      const result = await this.runMatchingAlgorithm(round.id, false, transaction);
 
       // Update round with results
       await round.update({
