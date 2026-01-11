@@ -9,9 +9,9 @@ const fs = require('fs');
 // Map template types to file names
 const templateTypeToFile = {
   welcome: 'welcome',
-  pairing_notification: 'pairingNotification',
-  meeting_reminder: 'meetingReminder',
-  feedback_request: 'feedbackRequest'
+  pairing_notification: 'pairing_notification',
+  meeting_reminder: 'meeting_reminder',
+  feedback_request: 'feedback_request'
 };
 
 /**

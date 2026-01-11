@@ -22,37 +22,51 @@ class MatchingService {
 
   /**
    * Get eligible participants for matching
-   * Excludes users who opted in within the grace period (48 hours by default)
+   * Checks: active, opted_in, grace period, available_from, department status
    */
   async getEligibleParticipants() {
     // Get grace period setting (in hours), default to 48 hours
     const gracePeriodHours = await this.getSetting('matching.grace_period_hours', 48);
     const gracePeriodCutoff = new Date(Date.now() - gracePeriodHours * 60 * 60 * 1000);
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
+    // First, get all opted-in active users
     const users = await User.findAll({
       where: {
         is_active: true,
-        is_opted_in: true,
-        // Exclude users who opted in within the grace period
-        // Users must have opted in before the cutoff time, OR have no opted_in_at date (legacy users)
-        [Op.or]: [
-          { opted_in_at: { [Op.lt]: gracePeriodCutoff } },
-          { opted_in_at: null }
-        ]
+        is_opted_in: true
       },
       include: [
         {
           association: 'department',
-          where: {
-            is_active: true
-          },
-          required: true
+          required: false // Allow users without department or with inactive department (if override is set)
         }
       ]
     });
 
-    logger.info(`Found ${users.length} eligible participants for matching (grace period: ${gracePeriodHours}h)`);
-    return users;
+    // Filter eligible participants based on all criteria
+    const eligible = users.filter(user => {
+      // Check available_from date (must be null or <= today)
+      if (user.available_from && user.available_from > today) {
+        return false;
+      }
+
+      // Check department status (with override support)
+      const deptActive = user.department && user.department.is_active;
+      if (!deptActive && !user.override_department_exclusion) {
+        return false;
+      }
+
+      // Check grace period (with skip_grace_period override)
+      if (!user.skip_grace_period && user.opted_in_at && new Date(user.opted_in_at) > gracePeriodCutoff) {
+        return false;
+      }
+
+      return true;
+    });
+
+    logger.info(`Found ${eligible.length} eligible participants for matching (grace period: ${gracePeriodHours}h)`);
+    return eligible;
   }
 
   /**
@@ -101,9 +115,37 @@ class MatchingService {
   }
 
   /**
+   * Check if two users are compatible based on their matching preferences
+   */
+  areMatchingPreferencesCompatible(user1, user2) {
+    const pref1 = user1.matching_preference || 'any';
+    const pref2 = user2.matching_preference || 'any';
+
+    const sameDept = user1.department_id === user2.department_id;
+    const sameSeniority = user1.seniority_level === user2.seniority_level;
+
+    // Check user1's preference
+    if (pref1 === 'cross_department_only' && sameDept) return false;
+    if (pref1 === 'same_department_only' && !sameDept) return false;
+    if (pref1 === 'cross_seniority_only' && sameSeniority) return false;
+
+    // Check user2's preference
+    if (pref2 === 'cross_department_only' && sameDept) return false;
+    if (pref2 === 'same_department_only' && !sameDept) return false;
+    if (pref2 === 'cross_seniority_only' && sameSeniority) return false;
+
+    return true;
+  }
+
+  /**
    * Calculate match score between two users
    */
   async calculateMatchScore(user1, user2, recentPairings, settings) {
+    // First check if preferences allow this match
+    if (!this.areMatchingPreferencesCompatible(user1, user2)) {
+      return -Infinity; // Incompatible preferences
+    }
+
     let score = 100; // Base score
 
     // Penalty for recent pairing (stronger for more recent)
@@ -203,11 +245,49 @@ class MatchingService {
         }
       }
 
-      // 5. Handle odd person out
+      // 5. Handle odd person out (VIPs should never sit out)
       let unpaired = null;
       if (participants.length % 2 !== 0) {
-        unpaired = participants.find(p => !used.has(p.id));
-        logger.info(`Odd number of participants - user ${unpaired?.id} will sit out this round`);
+        // Find the unpaired user
+        const unpairedUser = participants.find(p => !used.has(p.id));
+
+        // If the unpaired user is a VIP, we need to swap them with a non-VIP from a pairing
+        if (unpairedUser && unpairedUser.is_vip) {
+          // Find a pairing where we can swap out a non-VIP
+          let swapped = false;
+          for (const pairing of pairings) {
+            const user1IsVip = pairing.user1.is_vip;
+            const user2IsVip = pairing.user2.is_vip;
+
+            // If either user in the pairing is not a VIP, swap them out
+            if (!user1IsVip) {
+              // Swap user1 with the VIP
+              unpaired = pairing.user1;
+              pairing.user1_id = unpairedUser.id;
+              pairing.user1 = unpairedUser;
+              swapped = true;
+              logger.info(`VIP user ${unpairedUser.id} swapped into pairing, non-VIP user ${unpaired.id} will sit out`);
+              break;
+            } else if (!user2IsVip) {
+              // Swap user2 with the VIP
+              unpaired = pairing.user2;
+              pairing.user2_id = unpairedUser.id;
+              pairing.user2 = unpairedUser;
+              swapped = true;
+              logger.info(`VIP user ${unpairedUser.id} swapped into pairing, non-VIP user ${unpaired.id} will sit out`);
+              break;
+            }
+          }
+
+          // If we couldn't swap (all participants are VIPs), the original unpaired stays
+          if (!swapped) {
+            unpaired = unpairedUser;
+            logger.warn(`All participants are VIPs - VIP user ${unpaired.id} will sit out this round`);
+          }
+        } else {
+          unpaired = unpairedUser;
+          logger.info(`Odd number of participants - user ${unpaired?.id} will sit out this round`);
+        }
       }
 
       logger.info(`Created ${pairings.length} pairings for round ${roundId}`);
@@ -244,7 +324,7 @@ class MatchingService {
             email: p.user1.email,
             firstName: p.user1.first_name,
             lastName: p.user1.last_name,
-            department: p.user1.department.name,
+            department: p.user1.department?.name || 'No Department',
             seniorityLevel: p.user1.seniority_level
           },
           user2: {
@@ -252,7 +332,7 @@ class MatchingService {
             email: p.user2.email,
             firstName: p.user2.first_name,
             lastName: p.user2.last_name,
-            department: p.user2.department.name,
+            department: p.user2.department?.name || 'No Department',
             seniorityLevel: p.user2.seniority_level
           },
           score: p.score

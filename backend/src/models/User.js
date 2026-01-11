@@ -90,6 +90,40 @@ module.exports = (sequelize) => {
       allowNull: true,
       comment: 'When user opted out of Coffee Roulette'
     },
+    skip_grace_period: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      comment: 'Admin override to bypass 48h grace period'
+    },
+    available_from: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'Date from which user is available for matching (null = immediately)'
+    },
+    override_department_exclusion: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      comment: 'Allow participation even if department is inactive'
+    },
+    matching_preference: {
+      type: DataTypes.ENUM('any', 'cross_department_only', 'same_department_only', 'cross_seniority_only'),
+      defaultValue: 'any',
+      allowNull: false,
+      comment: 'User preference for matching criteria'
+    },
+    is_vip: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      comment: 'VIP users are guaranteed a match (never sit out)'
+    },
+    admin_notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Admin-only notes about the user'
+    },
     last_synced_at: {
       type: DataTypes.DATE,
       allowNull: true,
@@ -106,7 +140,9 @@ module.exports = (sequelize) => {
       { fields: ['department_id'] },
       { fields: ['is_opted_in'] },
       { fields: ['is_active'] },
-      { fields: ['opt_out_token'] }
+      { fields: ['opt_out_token'] },
+      { fields: ['available_from'] },
+      { fields: ['is_vip'] }
     ]
   });
 

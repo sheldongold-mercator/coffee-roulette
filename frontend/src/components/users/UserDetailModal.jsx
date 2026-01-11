@@ -12,6 +12,9 @@ import {
   EnvelopeIcon,
   ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon,
+  CogIcon,
+  DocumentTextIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { userAPI, departmentAPI } from '../../services/api';
@@ -24,6 +27,13 @@ const seniorityLevels = [
   { value: 'lead', label: 'Lead' },
   { value: 'head', label: 'Head' },
   { value: 'executive', label: 'Executive' },
+];
+
+const matchingPreferences = [
+  { value: 'any', label: 'Any (No Preference)' },
+  { value: 'cross_department_only', label: 'Cross-Department Only' },
+  { value: 'same_department_only', label: 'Same Department Only' },
+  { value: 'cross_seniority_only', label: 'Cross-Seniority Only' },
 ];
 
 const statusConfig = {
@@ -84,6 +94,14 @@ const UserDetailModal = ({ userId, onClose }) => {
         seniorityLevel: user.seniorityLevel || '',
         isActive: user.isActive ?? true,
         isOptedIn: user.isOptedIn ?? true,
+        // Matching settings
+        skipGracePeriod: user.skipGracePeriod ?? false,
+        availableFrom: user.availableFrom || '',
+        overrideDepartmentExclusion: user.overrideDepartmentExclusion ?? false,
+        matchingPreference: user.matchingPreference || 'any',
+        isVip: user.isVip ?? false,
+        // Notes
+        adminNotes: user.adminNotes || '',
       });
       setHasChanges(false);
     }
@@ -167,10 +185,10 @@ const UserDetailModal = ({ userId, onClose }) => {
 
         {/* Tabs */}
         <div className="px-6 border-b border-gray-200">
-          <nav className="-mb-px flex gap-6">
+          <nav className="-mb-px flex gap-4 overflow-x-auto">
             <button
               onClick={() => setActiveTab('profile')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                 activeTab === 'profile'
                   ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -179,24 +197,44 @@ const UserDetailModal = ({ userId, onClose }) => {
               Profile
             </button>
             <button
+              onClick={() => setActiveTab('matching')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                activeTab === 'matching'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Matching
+            </button>
+            <button
+              onClick={() => setActiveTab('notes')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                activeTab === 'notes'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Notes
+            </button>
+            <button
               onClick={() => setActiveTab('history')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                 activeTab === 'history'
                   ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Pairing History ({pairingHistory.length})
+              History ({pairingHistory.length})
             </button>
             <button
               onClick={() => setActiveTab('communications')}
-              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
                 activeTab === 'communications'
                   ? 'border-primary-600 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Communications ({notificationHistory.length})
+              Comms ({notificationHistory.length})
             </button>
           </nav>
         </div>
@@ -334,6 +372,141 @@ const UserDetailModal = ({ userId, onClose }) => {
                 <p>Created: {user?.createdAt ? new Date(user.createdAt).toLocaleString() : 'N/A'}</p>
                 <p>Last Updated: {user?.updatedAt ? new Date(user.updatedAt).toLocaleString() : 'N/A'}</p>
                 <p>Last Synced: {user?.lastSyncedAt ? new Date(user.lastSyncedAt).toLocaleString() : 'Never'}</p>
+              </div>
+            </div>
+          ) : activeTab === 'matching' ? (
+            /* Matching Settings Tab */
+            <div className="space-y-6">
+              {/* Department Status (Read-only) */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Department Status</h4>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-900">{user?.department?.name || 'No Department'}</span>
+                  {user?.department ? (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      user.department.isActive
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {user.department.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  ) : null}
+                </div>
+                {user?.department && !user.department.isActive && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Department is inactive. Enable "Override Department Exclusion" below to allow participation.
+                  </p>
+                )}
+              </div>
+
+              {/* Matching Overrides */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-gray-700">Admin Overrides</h4>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.overrideDepartmentExclusion ?? false}
+                    onChange={(e) => handleInputChange('overrideDepartmentExclusion', e.target.checked)}
+                    className="mt-0.5 w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Override Department Exclusion</span>
+                    <p className="text-xs text-gray-500">Allow user to participate even if their department is inactive</p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.skipGracePeriod ?? false}
+                    onChange={(e) => handleInputChange('skipGracePeriod', e.target.checked)}
+                    className="mt-0.5 w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Skip Grace Period</span>
+                    <p className="text-xs text-gray-500">Bypass the 48-hour grace period for newly opted-in users</p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isVip ?? false}
+                    onChange={(e) => handleInputChange('isVip', e.target.checked)}
+                    className="mt-0.5 w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                      <SparklesIcon className="w-4 h-4 text-amber-500" />
+                      VIP Status
+                    </span>
+                    <p className="text-xs text-gray-500">VIP users are guaranteed a match and will never sit out a round</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Available From Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Available From
+                </label>
+                <input
+                  type="date"
+                  value={formData.availableFrom || ''}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => handleInputChange('availableFrom', e.target.value)}
+                  className="input w-full max-w-xs"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty for immediate availability. Set a future date to temporarily exclude from matching (e.g., when on leave).
+                </p>
+              </div>
+
+              {/* Matching Preference */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Matching Preference
+                </label>
+                <select
+                  value={formData.matchingPreference || 'any'}
+                  onChange={(e) => handleInputChange('matchingPreference', e.target.value)}
+                  className="input w-full max-w-xs"
+                >
+                  {matchingPreferences.map((pref) => (
+                    <option key={pref.value} value={pref.value}>
+                      {pref.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Controls what types of matches are allowed for this user.
+                </p>
+              </div>
+            </div>
+          ) : activeTab === 'notes' ? (
+            /* Notes Tab */
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Admin Notes
+                </label>
+                <textarea
+                  value={formData.adminNotes || ''}
+                  onChange={(e) => handleInputChange('adminNotes', e.target.value)}
+                  maxLength={2000}
+                  rows={10}
+                  className="input w-full resize-none"
+                  placeholder="Add internal notes about this user (admin-only, not visible to the user)..."
+                />
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-gray-500">
+                    These notes are only visible to administrators.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {(formData.adminNotes || '').length} / 2000
+                  </p>
+                </div>
               </div>
             </div>
           ) : activeTab === 'history' ? (
@@ -490,7 +663,7 @@ const UserDetailModal = ({ userId, onClose }) => {
           <button onClick={onClose} className="btn btn-secondary">
             Cancel
           </button>
-          {activeTab === 'profile' && (
+          {['profile', 'matching', 'notes'].includes(activeTab) && (
             <button
               onClick={handleSave}
               disabled={!hasChanges || updateMutation.isLoading}

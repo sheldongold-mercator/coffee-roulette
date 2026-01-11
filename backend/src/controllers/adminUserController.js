@@ -75,11 +75,25 @@ const getUsers = async (req, res) => {
     // Helper to compute participation status (matches matchingService logic)
     const getParticipationStatus = (user) => {
       if (!user.is_opted_in) return 'opted_out';
-      if (!user.department || !user.department.is_active) return 'opted_in_excluded';
+
+      // Check if user has a future available_from date
+      if (user.available_from && new Date(user.available_from) > new Date()) {
+        return 'temporarily_excluded';
+      }
+
+      // Check department exclusion (with override)
+      if (!user.department || !user.department.is_active) {
+        if (!user.override_department_exclusion) {
+          return 'opted_in_excluded';
+        }
+      }
+
       // Check grace period - user must have opted in before cutoff OR have no opted_in_at
-      if (user.opted_in_at && new Date(user.opted_in_at) > gracePeriodCutoff) {
+      // Skip grace period check if admin override is set
+      if (!user.skip_grace_period && user.opted_in_at && new Date(user.opted_in_at) > gracePeriodCutoff) {
         return 'in_grace_period';
       }
+
       return 'eligible';
     };
 
@@ -106,7 +120,12 @@ const getUsers = async (req, res) => {
           seniorityLevel: user.seniority_level,
           isActive: user.is_active,
           isOptedIn: user.is_opted_in,
-          participationStatus, // 'eligible', 'opted_in_excluded', or 'opted_out'
+          participationStatus,
+          skipGracePeriod: user.skip_grace_period,
+          availableFrom: user.available_from,
+          overrideDepartmentExclusion: user.override_department_exclusion,
+          matchingPreference: user.matching_preference,
+          isVip: user.is_vip,
           isAdmin: !!user.adminRole,
           adminRole: user.adminRole ? user.adminRole.role : null,
           lastSyncedAt: user.last_synced_at,
@@ -283,6 +302,12 @@ const getUserById = async (req, res) => {
         seniorityLevel: user.seniority_level,
         isActive: user.is_active,
         isOptedIn: user.is_opted_in,
+        skipGracePeriod: user.skip_grace_period,
+        availableFrom: user.available_from,
+        overrideDepartmentExclusion: user.override_department_exclusion,
+        matchingPreference: user.matching_preference,
+        isVip: user.is_vip,
+        adminNotes: user.admin_notes,
         isAdmin: !!user.adminRole,
         adminRole: user.adminRole ? {
           role: user.adminRole.role,
@@ -325,7 +350,13 @@ const updateUser = async (req, res) => {
       role,
       seniorityLevel,
       isActive,
-      isOptedIn
+      isOptedIn,
+      skipGracePeriod,
+      availableFrom,
+      overrideDepartmentExclusion,
+      matchingPreference,
+      isVip,
+      adminNotes
     } = req.body;
 
     const user = await User.findByPk(userId);
@@ -349,6 +380,26 @@ const updateUser = async (req, res) => {
     if (isActive !== undefined) updates.is_active = isActive;
     if (isOptedIn !== undefined) updates.is_opted_in = isOptedIn;
 
+    // New matching-related fields
+    if (skipGracePeriod !== undefined) updates.skip_grace_period = skipGracePeriod;
+    if (availableFrom !== undefined) updates.available_from = availableFrom || null;
+    if (overrideDepartmentExclusion !== undefined) updates.override_department_exclusion = overrideDepartmentExclusion;
+    if (matchingPreference && ['any', 'cross_department_only', 'same_department_only', 'cross_seniority_only'].includes(matchingPreference)) {
+      updates.matching_preference = matchingPreference;
+    }
+    if (isVip !== undefined) updates.is_vip = isVip;
+
+    // Admin notes with character limit validation
+    if (adminNotes !== undefined) {
+      if (adminNotes && adminNotes.length > 2000) {
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'Admin notes cannot exceed 2000 characters'
+        });
+      }
+      updates.admin_notes = adminNotes || null;
+    }
+
     await user.update(updates);
 
     logger.info(`Admin ${req.user.id} updated user ${userId}`);
@@ -369,12 +420,19 @@ const updateUser = async (req, res) => {
         lastName: user.last_name,
         department: user.department ? {
           id: user.department.id,
-          name: user.department.name
+          name: user.department.name,
+          isActive: user.department.is_active
         } : null,
         role: user.role,
         seniorityLevel: user.seniority_level,
         isActive: user.is_active,
-        isOptedIn: user.is_opted_in
+        isOptedIn: user.is_opted_in,
+        skipGracePeriod: user.skip_grace_period,
+        availableFrom: user.available_from,
+        overrideDepartmentExclusion: user.override_department_exclusion,
+        matchingPreference: user.matching_preference,
+        isVip: user.is_vip,
+        adminNotes: user.admin_notes
       }
     });
   } catch (error) {
