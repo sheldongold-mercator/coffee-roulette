@@ -2,6 +2,7 @@ const logger = require('../utils/logger');
 const { NotificationTemplate } = require('../models');
 const { interpolate, prepareVariables } = require('../utils/templateInterpolation');
 const microsoftGraphService = require('./microsoftGraphService');
+const { getFrontendUrl, buildBackendUrl } = require('../config/urls');
 
 class EmailService {
   constructor() {
@@ -157,8 +158,8 @@ class EmailService {
       userEmail: user.email,
       departmentName,
       optOutToken: user.opt_out_token,
-      portalLink: process.env.FRONTEND_URL || 'http://localhost',
-      optOutLink: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/public/opt-out/${user.opt_out_token}`
+      portalLink: getFrontendUrl(),
+      optOutLink: buildBackendUrl(`/api/public/opt-out/${user.opt_out_token}`)
     };
 
     const { subject, html, text } = await this.getTemplate('welcome', variables);
@@ -185,8 +186,8 @@ class EmailService {
           userEmail: user.email,
           departmentName,
           optOutToken: user.opt_out_token,
-          portalLink: process.env.FRONTEND_URL || 'http://localhost',
-          optOutLink: `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/public/opt-out/${user.opt_out_token}`
+          portalLink: getFrontendUrl(),
+          optOutLink: buildBackendUrl(`/api/public/opt-out/${user.opt_out_token}`)
         };
 
         const { subject, html, text } = await this.getTemplate('welcome', variables);

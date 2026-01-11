@@ -1,4 +1,7 @@
+const { buildFrontendUrl } = require('../../config/urls');
+
 module.exports = ({ userName, partnerName, pairingId }) => {
+  const feedbackUrl = buildFrontendUrl(`/pairings/${pairingId}/feedback`);
   const subject = `📝 How was your coffee with ${partnerName}?`;
 
   const html = `
@@ -115,7 +118,7 @@ module.exports = ({ userName, partnerName, pairingId }) => {
     </div>
 
     <p style="text-align: center; margin-top: 30px;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost'}/pairings/${pairingId}/feedback" class="cta-button">
+      <a href="${feedbackUrl}" class="cta-button">
         Share Your Feedback
       </a>
     </p>
@@ -156,7 +159,7 @@ Your input helps us:
 • Enhance the overall experience
 • Demonstrate program value to leadership
 
-Share your feedback: ${process.env.FRONTEND_URL || 'http://localhost'}/pairings/${pairingId}/feedback
+Share your feedback: ${feedbackUrl}
 
 Didn't meet yet? No problem! You can submit feedback whenever you're ready.
 

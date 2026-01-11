@@ -1,6 +1,8 @@
 const { formatDate } = require('../../utils/helpers');
+const { buildFrontendUrl } = require('../../config/urls');
 
 module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meetingDate, icebreakers, pairingId }) => {
+  const pairingUrl = buildFrontendUrl(`/pairings/${pairingId}`);
   const formattedDate = meetingDate ? formatDate(meetingDate) : 'To be scheduled';
   const icebreakerList = icebreakers.map(topic => `• ${topic}`).join('\n');
   const icebreakerHTML = icebreakers.map(topic => `<li>${topic}</li>`).join('');
@@ -138,7 +140,7 @@ module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meet
     </ol>
 
     <p style="margin-top: 30px;">
-      <a href="${process.env.FRONTEND_URL || 'http://localhost'}/pairings/${pairingId}" class="cta-button">
+      <a href="${pairingUrl}" class="cta-button">
         View My Pairing
       </a>
     </p>
@@ -174,7 +176,7 @@ WHAT'S NEXT?
 3. Meet up: Grab a coffee and enjoy the conversation
 4. Share feedback: Let us know how it went
 
-View your pairing: ${process.env.FRONTEND_URL || 'http://localhost'}/pairings/${pairingId}
+View your pairing: ${pairingUrl}
 
 ---
 This is an automated message from Coffee Roulette.

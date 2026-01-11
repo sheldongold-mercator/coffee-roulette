@@ -4,6 +4,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const passport = require('./config/passport');
 const logger = require('./utils/logger');
+const { getCorsOrigin } = require('./config/urls');
 
 // Create Express app
 const app = express();
@@ -16,7 +17,7 @@ app.use(helmet());
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost',
+  origin: getCorsOrigin(),
   credentials: true,
   optionsSuccessStatus: 200
 };

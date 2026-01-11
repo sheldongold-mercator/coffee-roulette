@@ -3,7 +3,8 @@
  * Used when generating template previews in the admin interface
  */
 
-const baseUrl = process.env.FRONTEND_URL || 'https://coffee-roulette.mercator.com';
+const { getFrontendUrl } = require('../config/urls');
+const baseUrl = getFrontendUrl();
 
 module.exports = {
   welcome: {

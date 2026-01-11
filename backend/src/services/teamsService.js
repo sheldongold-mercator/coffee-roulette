@@ -2,6 +2,7 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 const { NotificationTemplate } = require('../models');
 const { interpolateJson, prepareVariables } = require('../utils/templateInterpolation');
+const { buildFrontendUrl } = require('../config/urls');
 
 class TeamsService {
   constructor() {
@@ -162,7 +163,7 @@ class TeamsService {
               {
                 type: 'Action.OpenUrl',
                 title: 'View Pairing Details',
-                url: `${process.env.FRONTEND_URL || 'http://localhost'}/pairings/${pairingId}`
+                url: buildFrontendUrl(`/pairings/${pairingId}`)
               },
               {
                 type: 'Action.OpenUrl',
@@ -245,7 +246,7 @@ class TeamsService {
               {
                 type: 'Action.OpenUrl',
                 title: 'View Meeting Details',
-                url: `${process.env.FRONTEND_URL || 'http://localhost'}/pairings/${pairingId}`
+                url: buildFrontendUrl(`/pairings/${pairingId}`)
               }
             ],
             $schema: 'http://adaptivecards.io/schemas/adaptive-card.json'
@@ -302,7 +303,7 @@ class TeamsService {
               {
                 type: 'Action.OpenUrl',
                 title: 'Share Feedback',
-                url: `${process.env.FRONTEND_URL || 'http://localhost'}/pairings/${pairingId}/feedback`
+                url: buildFrontendUrl(`/pairings/${pairingId}/feedback`)
               }
             ],
             $schema: 'http://adaptivecards.io/schemas/adaptive-card.json'
