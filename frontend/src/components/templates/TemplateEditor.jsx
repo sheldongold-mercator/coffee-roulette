@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import Editor from '@monaco-editor/react';
@@ -23,6 +23,11 @@ const TemplateEditor = ({ template, onClose }) => {
   const [showPreview, setShowPreview] = useState(false);
   const [showVariables, setShowVariables] = useState(true);
   const [previewData, setPreviewData] = useState(null);
+
+  // Editor refs for cursor position insertion
+  const htmlEditorRef = useRef(null);
+  const textEditorRef = useRef(null);
+  const jsonEditorRef = useRef(null);
 
   // Content state
   const [subject, setSubject] = useState('');
@@ -50,8 +55,12 @@ const TemplateEditor = ({ template, onClose }) => {
   const updateMutation = useMutation(
     (data) => templateAPI.updateTemplate(template.templateType, template.channel, data),
     {
-      onSuccess: () => {
-        queryClient.invalidateQueries('templates');
+      onSuccess: async () => {
+        // Invalidate and refetch both the templates list and this specific template
+        await queryClient.invalidateQueries('templates');
+        await queryClient.invalidateQueries(['template', template.templateType, template.channel]);
+        // Force refetch to ensure UI updates
+        await queryClient.refetchQueries(['template', template.templateType, template.channel]);
         toast.success('Template saved successfully!');
         setHasChanges(false);
       },
@@ -132,17 +141,60 @@ const TemplateEditor = ({ template, onClose }) => {
 
   const variables = templateData?.data?.data?.variables || template.variables || [];
 
+  // Get the current editor based on active tab
+  const getCurrentEditor = () => {
+    if (activeTab === 'html') return htmlEditorRef.current;
+    if (activeTab === 'text') return textEditorRef.current;
+    if (activeTab === 'json') return jsonEditorRef.current;
+    return null;
+  };
+
   const insertVariable = (varName) => {
     const insertion = `\${${varName}}`;
-    // This is a simple approach - for production, you'd want to integrate with Monaco's API
-    if (activeTab === 'html') {
-      setHtmlContent(prev => prev + insertion);
-    } else if (activeTab === 'text') {
-      setTextContent(prev => prev + insertion);
-    } else if (activeTab === 'json') {
-      setJsonContent(prev => prev + insertion);
+    const editor = getCurrentEditor();
+
+    if (editor) {
+      // Get the current selection or cursor position
+      const selection = editor.getSelection();
+
+      // Create an edit operation to insert/replace at cursor
+      const op = {
+        range: selection,
+        text: insertion,
+        forceMoveMarkers: true
+      };
+
+      // Execute the edit
+      editor.executeEdits('variable-insert', [op]);
+
+      // Focus the editor after insertion
+      editor.focus();
+
+      toast.success(`Inserted ${insertion}`);
+    } else {
+      // Fallback: append to content if editor not available
+      if (activeTab === 'html') {
+        setHtmlContent(prev => prev + insertion);
+      } else if (activeTab === 'text') {
+        setTextContent(prev => prev + insertion);
+      } else if (activeTab === 'json') {
+        setJsonContent(prev => prev + insertion);
+      }
+      toast.success(`Inserted ${insertion} at end`);
     }
-    toast.success(`Inserted ${insertion}`);
+  };
+
+  // Editor mount handlers to capture editor instances
+  const handleHtmlEditorMount = (editor) => {
+    htmlEditorRef.current = editor;
+  };
+
+  const handleTextEditorMount = (editor) => {
+    textEditorRef.current = editor;
+  };
+
+  const handleJsonEditorMount = (editor) => {
+    jsonEditorRef.current = editor;
   };
 
   return (
@@ -272,6 +324,7 @@ const TemplateEditor = ({ template, onClose }) => {
                           theme="vs-dark"
                           value={htmlContent}
                           onChange={(value) => setHtmlContent(value || '')}
+                          onMount={handleHtmlEditorMount}
                           options={{
                             minimap: { enabled: false },
                             wordWrap: 'on',
@@ -287,6 +340,7 @@ const TemplateEditor = ({ template, onClose }) => {
                           theme="vs-dark"
                           value={textContent}
                           onChange={(value) => setTextContent(value || '')}
+                          onMount={handleTextEditorMount}
                           options={{
                             minimap: { enabled: false },
                             wordWrap: 'on',
@@ -303,6 +357,7 @@ const TemplateEditor = ({ template, onClose }) => {
                         theme="vs-dark"
                         value={jsonContent}
                         onChange={(value) => setJsonContent(value || '')}
+                        onMount={handleJsonEditorMount}
                         options={{
                           minimap: { enabled: false },
                           wordWrap: 'on',
@@ -338,7 +393,7 @@ const TemplateEditor = ({ template, onClose }) => {
               {showVariables && (
                 <div className="px-4 pb-4 space-y-3">
                   <p className="text-xs text-gray-500">
-                    Click a variable to insert it at the end of the editor
+                    Click a variable to insert it at your cursor position (or replace selected text)
                   </p>
                   {variables.map((v) => (
                     <div
