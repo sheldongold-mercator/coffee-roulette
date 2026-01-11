@@ -413,9 +413,9 @@ Configured via node-cron with dynamic scheduling:
 
 **Email Templates** (in `backend/src/templates/emails/`):
 - `welcome.js` - Welcome email for new participants with opt-out link
-- `pairingNotification.js` - Notification when matched with a coffee partner
-- `meetingReminder.js` - Reminders before scheduled meetings
-- `feedbackRequest.js` - Request for feedback after meetings
+- `pairing_notification.js` - Notification when matched with a coffee partner
+- `meeting_reminder.js` - Reminders before scheduled meetings
+- `feedback_request.js` - Request for feedback after meetings
 
 ### User Portal
 
