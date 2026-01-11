@@ -1,5 +1,8 @@
-# Auto Claude data directory
+# Claude Code
 .auto-claude/
+.claude/settings.local.json
+.claude/*.local.json
+CLAUDE.local.md
 
 # Environment variables
 .env
