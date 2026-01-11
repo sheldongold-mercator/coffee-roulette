@@ -37,26 +37,34 @@ const UserDetailModal = ({ userId, onClose }) => {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Fetch user details
-  const { data: userData, isLoading } = useQuery(
+  const { data: userData, isLoading, isError, error } = useQuery(
     ['user', userId],
     () => userAPI.getUserById(userId),
     {
       enabled: !!userId,
-      onSuccess: (data) => {
-        const user = data?.data?.user || data?.user;
-        if (user) {
-          setFormData({
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            departmentId: user.department?.id || '',
-            seniorityLevel: user.seniorityLevel || '',
-            isActive: user.isActive ?? true,
-            isOptedIn: user.isOptedIn ?? true,
-          });
-        }
-      },
     }
   );
+
+  // Extract user data from response (axios wraps in .data)
+  const apiResponse = userData?.data || userData;
+  const user = apiResponse?.user;
+  const pairingHistory = apiResponse?.pairingHistory || [];
+  const stats = apiResponse?.stats || {};
+
+  // Populate form when user data loads
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        departmentId: user.department?.id || '',
+        seniorityLevel: user.seniorityLevel || '',
+        isActive: user.isActive ?? true,
+        isOptedIn: user.isOptedIn ?? true,
+      });
+      setHasChanges(false);
+    }
+  }, [user]);
 
   // Fetch departments for dropdown
   const { data: departmentsData } = useQuery(['departments-list'], () =>
@@ -84,10 +92,6 @@ const UserDetailModal = ({ userId, onClose }) => {
       },
     }
   );
-
-  const user = userData?.data?.user || userData?.user;
-  const pairingHistory = userData?.data?.pairingHistory || userData?.pairingHistory || [];
-  const stats = userData?.data?.stats || userData?.stats || {};
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
