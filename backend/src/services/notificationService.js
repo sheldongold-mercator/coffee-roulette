@@ -12,7 +12,7 @@ class NotificationService {
     try {
       const notification = await NotificationQueue.create({
         pairing_id: pairingId,
-        recipient_id: recipientId,
+        recipient_user_id: recipientId,
         notification_type: notificationType,
         channel,
         status: 'pending',
