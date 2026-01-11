@@ -60,7 +60,8 @@ const Matching = () => {
     ? roundsData.data
     : [];
   const eligibleCount = eligibleData?.data?.data?.count || eligibleData?.data?.count || 0;
-  const preview = previewData?.data?.data || previewData?.data?.preview || previewData?.preview || null;
+  const previewInfo = previewData?.data?.preview || previewData?.preview || null;
+  const previewPairings = previewData?.data?.pairings || previewData?.pairings || [];
 
   return (
     <div className="space-y-6">
@@ -176,25 +177,35 @@ const Matching = () => {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
-          ) : preview ? (
+          ) : previewPairings.length > 0 ? (
             <div>
               <p className="text-sm text-gray-600 mb-4">
-                Preview of potential pairings. This does not create actual pairings.
+                Preview of potential pairings ({previewInfo?.totalParticipants || 0} participants, {previewPairings.length} pairings). This does not create actual pairings.
               </p>
               <div className="space-y-2">
-                {preview.pairings?.map((pairing, index) => (
+                {previewPairings.map((pairing, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-900">
-                        {pairing.user1Name}
-                      </span>
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">
+                          {pairing.user1?.firstName} {pairing.user1?.lastName}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          ({pairing.user1?.department})
+                        </span>
+                      </div>
                       <span className="text-gray-400">↔</span>
-                      <span className="text-sm font-medium text-gray-900">
-                        {pairing.user2Name}
-                      </span>
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">
+                          {pairing.user2?.firstName} {pairing.user2?.lastName}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          ({pairing.user2?.department})
+                        </span>
+                      </div>
                     </div>
                     <span className="text-xs text-gray-500">
                       Score: {pairing.score}
@@ -202,10 +213,15 @@ const Matching = () => {
                   </div>
                 ))}
               </div>
+              {previewInfo?.unpaired && (
+                <p className="text-sm text-amber-600 mt-4">
+                  Note: {previewInfo.unpaired.firstName} {previewInfo.unpaired.lastName} will sit out this round (odd number of participants)
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-gray-500 text-center py-8">
-              No preview data available
+              No preview data available. Need at least 2 eligible participants.
             </p>
           )}
         </motion.div>
