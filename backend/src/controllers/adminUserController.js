@@ -1,4 +1,4 @@
-const { User, Department, Pairing, MeetingFeedback, MatchingRound } = require('../models');
+const { User, Department, Pairing, MeetingFeedback, MatchingRound, NotificationQueue } = require('../models');
 const { Op } = require('sequelize');
 const microsoftGraphService = require('../services/microsoftGraphService');
 const logger = require('../utils/logger');
@@ -212,6 +212,50 @@ const getUserById = async (req, res) => {
       };
     });
 
+    // Fetch notification history for this user
+    const notifications = await NotificationQueue.findAll({
+      where: { recipient_user_id: userId },
+      include: [
+        {
+          model: Pairing,
+          as: 'pairing',
+          attributes: ['id'],
+          include: [
+            { model: User, as: 'user1', attributes: ['first_name', 'last_name'] },
+            { model: User, as: 'user2', attributes: ['first_name', 'last_name'] }
+          ]
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: 50
+    });
+
+    const notificationHistory = notifications.map(notification => {
+      // Get partner name from pairing if available
+      let partnerName = null;
+      if (notification.pairing) {
+        const partner = notification.pairing.user1_id === parseInt(userId, 10)
+          ? notification.pairing.user2
+          : notification.pairing.user1;
+        if (partner) {
+          partnerName = `${partner.first_name} ${partner.last_name}`;
+        }
+      }
+
+      return {
+        id: notification.id,
+        type: notification.notification_type,
+        channel: notification.channel,
+        status: notification.status,
+        scheduledFor: notification.scheduled_for,
+        sentAt: notification.sent_at,
+        errorMessage: notification.error_message,
+        retryCount: notification.retry_count,
+        partnerName,
+        createdAt: notification.created_at
+      };
+    });
+
     res.json({
       user: {
         id: user.id,
@@ -238,6 +282,7 @@ const getUserById = async (req, res) => {
         updatedAt: user.updated_at
       },
       pairingHistory,
+      notificationHistory,
       stats: {
         totalPairings: pairings.length,
         completedPairings: pairings.filter(p => p.status === 'completed').length,

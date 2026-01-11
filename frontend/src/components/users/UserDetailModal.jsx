@@ -9,6 +9,9 @@ import {
   XCircleIcon,
   StarIcon,
   CalendarIcon,
+  EnvelopeIcon,
+  ChatBubbleLeftRightIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { userAPI, departmentAPI } from '../../services/api';
@@ -30,6 +33,25 @@ const statusConfig = {
   cancelled: { label: 'Cancelled', color: 'text-gray-500 bg-gray-100', icon: XCircleIcon },
 };
 
+const notificationStatusConfig = {
+  pending: { label: 'Pending', color: 'text-amber-600 bg-amber-100', icon: ClockIcon },
+  sent: { label: 'Sent', color: 'text-green-600 bg-green-100', icon: CheckCircleIcon },
+  failed: { label: 'Failed', color: 'text-red-600 bg-red-100', icon: XCircleIcon },
+};
+
+const notificationTypeConfig = {
+  pairing: { label: 'Pairing Notification', icon: ChatBubbleLeftRightIcon },
+  reminder: { label: 'Meeting Reminder', icon: CalendarIcon },
+  feedback_request: { label: 'Feedback Request', icon: StarIcon },
+  admin_alert: { label: 'Admin Alert', icon: ExclamationTriangleIcon },
+};
+
+const channelConfig = {
+  email: { label: 'Email', icon: EnvelopeIcon },
+  teams: { label: 'Teams', icon: ChatBubbleLeftRightIcon },
+  both: { label: 'Email & Teams', icon: EnvelopeIcon },
+};
+
 const UserDetailModal = ({ userId, onClose }) => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('profile');
@@ -49,6 +71,7 @@ const UserDetailModal = ({ userId, onClose }) => {
   const apiResponse = userData?.data || userData;
   const user = apiResponse?.user;
   const pairingHistory = apiResponse?.pairingHistory || [];
+  const notificationHistory = apiResponse?.notificationHistory || [];
   const stats = apiResponse?.stats || {};
 
   // Populate form when user data loads
@@ -164,6 +187,16 @@ const UserDetailModal = ({ userId, onClose }) => {
               }`}
             >
               Pairing History ({pairingHistory.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('communications')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'communications'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Communications ({notificationHistory.length})
             </button>
           </nav>
         </div>
@@ -303,7 +336,7 @@ const UserDetailModal = ({ userId, onClose }) => {
                 <p>Last Synced: {user?.lastSyncedAt ? new Date(user.lastSyncedAt).toLocaleString() : 'Never'}</p>
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'history' ? (
             /* Pairing History Tab */
             <div className="space-y-4">
               {pairingHistory.length === 0 ? (
@@ -369,6 +402,79 @@ const UserDetailModal = ({ userId, onClose }) => {
                               "{pairing.feedback.comments}"
                             </p>
                           )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+            /* Communications Tab */
+            <div className="space-y-4">
+              {notificationHistory.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <EnvelopeIcon className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>No communications sent yet</p>
+                </div>
+              ) : (
+                notificationHistory.map((notification) => {
+                  const status = notificationStatusConfig[notification.status] || notificationStatusConfig.pending;
+                  const StatusIcon = status.icon;
+                  const typeInfo = notificationTypeConfig[notification.type] || notificationTypeConfig.pairing;
+                  const TypeIcon = typeInfo.icon;
+                  const channelInfo = channelConfig[notification.channel] || channelConfig.email;
+
+                  return (
+                    <div
+                      key={notification.id}
+                      className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full text-blue-600">
+                            <TypeIcon className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{typeInfo.label}</p>
+                            <p className="text-sm text-gray-500">
+                              {channelInfo.label}
+                              {notification.partnerName && ` • Partner: ${notification.partnerName}`}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {status.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                        {notification.scheduledFor && (
+                          <span className="flex items-center gap-1">
+                            <ClockIcon className="w-4 h-4" />
+                            Scheduled: {new Date(notification.scheduledFor).toLocaleString()}
+                          </span>
+                        )}
+                        {notification.sentAt && (
+                          <span className="flex items-center gap-1">
+                            <CheckCircleIcon className="w-4 h-4" />
+                            Sent: {new Date(notification.sentAt).toLocaleString()}
+                          </span>
+                        )}
+                        {notification.retryCount > 0 && (
+                          <span className="text-amber-600">
+                            Retries: {notification.retryCount}
+                          </span>
+                        )}
+                      </div>
+
+                      {notification.status === 'failed' && notification.errorMessage && (
+                        <div className="mt-3 pt-3 border-t border-gray-200">
+                          <p className="text-sm text-red-600">
+                            <ExclamationTriangleIcon className="w-4 h-4 inline mr-1" />
+                            Error: {notification.errorMessage}
+                          </p>
                         </div>
                       )}
                     </div>
