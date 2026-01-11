@@ -77,16 +77,23 @@ const loginWithMicrosoft = async (req, res) => {
 
         logger.info(`User created successfully: ${user.email} (ID: ${user.id})`);
       } catch (createError) {
-        // If user was created by a concurrent request, fetch them
+        // If user was created by a concurrent request or exists with different microsoft_id
         if (createError.name === 'SequelizeUniqueConstraintError') {
-          logger.info(`User already exists (concurrent creation), fetching: ${msProfile.email}`);
+          logger.info(`User already exists, fetching by email: ${msProfile.email}`);
           user = await User.findOne({
-            where: { microsoft_id: msProfile.id },
+            where: { email: msProfile.email },
             include: [
               { association: 'department' },
               { association: 'adminRole' }
             ]
           });
+
+          // Update microsoft_id if it changed (e.g., user was synced before first login)
+          if (user && user.microsoft_id !== msProfile.id) {
+            logger.info(`Updating microsoft_id for user: ${msProfile.email}`);
+            user.microsoft_id = msProfile.id;
+            await user.save();
+          }
         } else {
           throw createError; // Re-throw if it's not a duplicate key error
         }

@@ -34,7 +34,7 @@ Coffee Roulette automatically pairs employees monthly for casual coffee meetings
 - **Charts**: Recharts
 
 ### Deployment
-- **Containerization**: Docker
+- **Containerisation**: Docker
 - **Orchestration**: Kubernetes (AWS EKS)
 - **Database**: MySQL container (with RDS migration path)
 - **Email Service**: AWS SES
@@ -144,7 +144,7 @@ EMAIL_FROM=noreply@your-company.com
 3. Click **New registration**
 4. Configure:
    - **Name**: Coffee Roulette
-   - **Supported account types**: Accounts in this organizational directory only
+   - **Supported account types**: Accounts in this organisational directory only
    - **Redirect URI**: `http://localhost:3000/api/auth/microsoft/callback`
 5. After creation, note the **Application (client) ID** and **Directory (tenant) ID**
 6. Create a **Client Secret** under Certificates & secrets
@@ -289,7 +289,7 @@ npm run build
 
 Key tables:
 - **users**: Employee information synced from Microsoft
-  - Includes `opt_out_token` (UUID for tokenized opt-out), `opted_in_at`, `opted_out_at`, `welcome_sent_at`
+  - Includes `opt_out_token` (UUID for tokenised opt-out), `opted_in_at`, `opted_out_at`, `welcome_sent_at`
 - **departments**: Organization departments with enrollment status
   - `is_active` controls whether department users are eligible for matching
   - `enrollment_date` records when department was first enabled
@@ -344,7 +344,7 @@ kubectl get services
 
 ### User Onboarding & Opt-Out Flow
 
-Coffee Roulette uses a frictionless onboarding system with tokenized opt-out:
+Coffee Roulette uses a frictionless onboarding system with tokenised opt-out:
 
 **Department Activation (Phased Rollout)**
 1. Admin enables a department via the dashboard
@@ -383,7 +383,7 @@ The pairing algorithm:
    - **+20 points** for cross-department matching (bonus)
    - **+10 points** for cross-seniority matching (bonus)
 4. Selects highest-scoring matches
-5. Handles odd numbers (one person sits out, prioritized next round)
+5. Handles odd numbers (one person sits out, prioritised next round)
 6. Assigns random icebreaker topics
 
 **Grace Period**: Users who opted in within the last 48 hours are excluded from matching, giving them time to opt-out if desired. This is configurable via `matching.grace_period_hours`.
@@ -411,7 +411,7 @@ Configured via node-cron:
 
 ### Template Management (Admin)
 
-Admins can customize email and Teams notification templates via the admin dashboard:
+Admins can customise email and Teams notification templates via the admin dashboard:
 
 **Features:**
 - **Monaco Code Editor**: Edit HTML/text emails and Teams Adaptive Card JSON with syntax highlighting
@@ -477,7 +477,7 @@ Admins can update these via the UI or API.
 - Input validation
 - SQL injection protection (Sequelize ORM)
 - Audit logging for admin actions
-- Tokenized opt-out links (UUID v4, unique per user, no auth required)
+- Tokenised opt-out links (UUID v4, unique per user, no auth required)
 
 ## Monitoring
 

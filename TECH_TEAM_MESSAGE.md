@@ -52,7 +52,7 @@ I've completed the development of **Coffee Roulette**, an internal employee pair
 - Tailwind CSS (modern, polished UI)
 - Framer Motion (smooth animations)
 - React Query (data fetching/caching)
-- Recharts (data visualization)
+- Recharts (data visualisation)
 - @azure/msal-browser + @azure/msal-react
 
 **Design:** Professional, polished admin interface with custom design system

@@ -20,7 +20,7 @@ Modern admin dashboard for managing the Coffee Roulette employee pairing system.
 - **Framer Motion** - Smooth animations
 - **Headless UI** - Accessible components
 - **React Query** - Data fetching and caching
-- **Recharts** - Data visualization
+- **Recharts** - Data visualisation
 - **Axios** - HTTP client
 - **MSAL** - Microsoft authentication
 
@@ -68,7 +68,7 @@ Create a production build:
 npm run build
 ```
 
-The optimized files will be in the `build/` directory.
+The optimised files will be in the `build/` directory.
 
 ### Linting
 
@@ -129,11 +129,11 @@ The app uses a comprehensive Tailwind-based design system with:
 
 ## API Integration
 
-All API calls go through the centralized service layer in `src/services/api.js`:
+All API calls go through the centralised service layer in `src/services/api.js`:
 
 - **Automatic JWT injection** via Axios interceptors
 - **Error handling** with automatic redirect on 401
-- **Organized by domain**: auth, analytics, users, departments, matching, settings
+- **Organised by domain**: auth, analytics, users, departments, matching, settings
 
 ## Browser Support
 

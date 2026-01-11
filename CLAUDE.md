@@ -82,7 +82,7 @@ npm test             # Run tests
 - **Services:** `xxxService.js` for business logic, singleton exports (`module.exports = new XxxService()`)
 - **Models:** PascalCase filenames, registered in `models/index.js`
 - **Routes:** Grouped under `/api/admin/*` for admin, `/api/public/*` for unauthenticated
-- **Error Handling:** Use `next(error)` pattern, centralized error middleware
+- **Error Handling:** Use `next(error)` pattern, centralised error middleware
 - **Logging:** Use Winston logger (`require('../utils/logger')`)
 
 ### Frontend
@@ -101,8 +101,8 @@ npm test             # Run tests
 ## Database
 
 ### Key Tables
-- `users` - Employee data synced from Microsoft, includes `opt_out_token` for tokenized opt-out
-- `departments` - Organization units with `is_active` for phased rollout
+- `users` - Employee data synced from Microsoft, includes `opt_out_token` for tokenised opt-out
+- `departments` - Organisation units with `is_active` for phased rollout
 - `matching_rounds` - Monthly matching execution records
 - `pairings` - User pairings with meeting details
 - `meeting_feedback` - User feedback and ratings
@@ -118,7 +118,7 @@ All models must be added to `backend/src/models/index.js` to be available via de
 - **Microsoft OAuth 2.0** via Azure AD (multi-tenant support)
 - **JWT tokens** for API authentication (7-day expiry)
 - **Admin middleware** checks `admin_users` table for role-based access
-- **Public endpoints** under `/api/public/*` require no auth (tokenized opt-out links)
+- **Public endpoints** under `/api/public/*` require no auth (tokenised opt-out links)
 
 ## Environment Variables
 
@@ -138,8 +138,8 @@ Frontend requires in `.env`:
 1. **Admin Dashboard** - Analytics, user management, department controls
 2. **Matching Algorithm** - Smart pairing with cross-department bonuses, repeat penalties
 3. **Department Phased Rollout** - Enable departments gradually with auto opt-in
-4. **Tokenized Opt-Out** - One-click opt-out links without authentication
-5. **Template Management** - Monaco editor for customizing email/Teams templates
+4. **Tokenised Opt-Out** - One-click opt-out links without authentication
+5. **Template Management** - Monaco editor for customising email/Teams templates
 6. **Microsoft Integration** - User sync, calendar events, Teams notifications
 
 ## Testing

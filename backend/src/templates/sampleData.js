@@ -24,7 +24,7 @@ module.exports = {
     icebreakers: [
       'What project are you most excited about right now?',
       'If you could have any superpower at work, what would it be?',
-      'What is your favorite team tradition?'
+      'What is your favourite team tradition?'
     ],
     pairingId: 12345
   },

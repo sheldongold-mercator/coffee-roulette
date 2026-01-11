@@ -147,7 +147,7 @@ module.exports = ({ userName, userEmail, departmentName, optOutToken }) => {
     <ul class="benefits-list">
       <li><strong>Build your network:</strong> Meet colleagues you might not otherwise cross paths with</li>
       <li><strong>Learn from others:</strong> Gain insights from different departments and roles</li>
-      <li><strong>Strengthen culture:</strong> Foster a sense of community across the organization</li>
+      <li><strong>Strengthen culture:</strong> Foster a sense of community across the organisation</li>
       <li><strong>It's just 30 minutes:</strong> A small time investment with lasting benefits</li>
     </ul>
 
@@ -196,7 +196,7 @@ You've been signed up to participate in Coffee Roulette. Each month, you'll be r
 WHY COFFEE ROULETTE?
 - Build your network: Meet colleagues you might not otherwise cross paths with
 - Learn from others: Gain insights from different departments and roles
-- Strengthen culture: Foster a sense of community across the organization
+- Strengthen culture: Foster a sense of community across the organisation
 - It's just 30 minutes: A small time investment with lasting benefits
 
 HOW IT WORKS

@@ -86,7 +86,7 @@ class TeamsService {
    */
   createPairingCard({ userName, partnerName, partnerEmail, partnerDepartment, meetingDate, icebreakers, pairingId }) {
     const meetingInfo = meetingDate
-      ? `**Scheduled:** ${new Date(meetingDate).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}`
+      ? `**Scheduled:** ${new Date(meetingDate).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' })}`
       : '**Scheduled:** To be arranged';
 
     const icebreakerFacts = icebreakers.map((topic, index) => ({
@@ -182,7 +182,7 @@ class TeamsService {
    */
   createReminderCard({ userName, partnerName, meetingDate, daysUntil, icebreakers, pairingId }) {
     const urgency = daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
-    const formattedDate = new Date(meetingDate).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
+    const formattedDate = new Date(meetingDate).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' });
 
     const icebreakerList = icebreakers.map((topic, index) => `${index + 1}. ${topic}`).join('\n\n');
 
