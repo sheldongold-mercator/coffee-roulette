@@ -47,11 +47,16 @@ const getDefaultTemplate = (type, channel) => {
         text_content: result.text || ''
       };
     } else if (channel === 'teams') {
-      // For Teams, we'd need to extract from teamsService
-      // Return a placeholder structure for now
       const teamsService = require('../services/teamsService');
 
-      // Get sample card content
+      // Check if teamsService exports rawTemplates (preferred for editor display)
+      if (teamsService.rawTemplates && teamsService.rawTemplates[type]) {
+        return {
+          json_content: JSON.stringify(teamsService.rawTemplates[type], null, 2)
+        };
+      }
+
+      // Fallback: execute card creator with sample data (legacy behavior)
       let cardContent = '';
       try {
         const sample = sampleData[type] || {};

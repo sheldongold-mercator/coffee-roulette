@@ -4,6 +4,7 @@
  */
 
 const { formatDate } = require('./helpers');
+const { buildFrontendUrl } = require('../config/urls');
 
 /**
  * Interpolate variables in a template string
@@ -59,15 +60,26 @@ function prepareVariables(rawVars, templateType) {
       .join('\n');
 
     vars.icebreakerList = vars.icebreakers
-      .map(topic => `  - ${topic}`)
-      .join('\n');
+      .map((topic, index) => `${index + 1}. ${topic}`)
+      .join('\n\n');
 
     vars.icebreakerText = vars.icebreakers.join(', ');
+
+    // Individual icebreaker variables for Teams cards
+    vars.icebreakers.forEach((topic, index) => {
+      vars[`icebreaker${index + 1}`] = topic;
+    });
   }
 
   // Calculate urgency text for reminders
   if (vars.daysUntil !== undefined) {
     vars.urgency = vars.daysUntil === 1 ? 'tomorrow' : `in ${vars.daysUntil} days`;
+  }
+
+  // Build URLs from pairingId if present
+  if (vars.pairingId) {
+    vars.pairingUrl = buildFrontendUrl(`/pairings/${vars.pairingId}`);
+    vars.feedbackUrl = buildFrontendUrl(`/pairings/${vars.pairingId}/feedback`);
   }
 
   return vars;

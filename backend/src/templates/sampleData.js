@@ -13,7 +13,9 @@ module.exports = {
     departmentName: 'Engineering',
     optOutToken: 'sample-uuid-token-12345',
     portalLink: baseUrl,
-    optOutLink: `${baseUrl}/api/public/opt-out/sample-uuid-token-12345`
+    optOutLink: `${baseUrl}/api/public/opt-out/sample-uuid-token-12345`,
+    matchingFrequency: 'monthly',
+    nextMatchingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // ~30 days from now
   },
 
   pairing_notification: {
@@ -27,7 +29,9 @@ module.exports = {
       'If you could have any superpower at work, what would it be?',
       'What is your favourite team tradition?'
     ],
-    pairingId: 12345
+    pairingId: 12345,
+    matchingFrequency: 'monthly',
+    nextMatchingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // ~30 days from now
   },
 
   meeting_reminder: {
@@ -60,7 +64,9 @@ module.exports.variableDefinitions = {
     { name: 'departmentName', description: 'Name of the user\'s department', example: 'Engineering', required: false },
     { name: 'optOutToken', description: 'Unique token for one-click opt-out', example: 'uuid-token', required: true },
     { name: 'portalLink', description: 'Link to the Coffee Roulette portal', example: 'https://...', required: true },
-    { name: 'optOutLink', description: 'Direct link to opt out', example: 'https://.../opt-out/token', required: true }
+    { name: 'optOutLink', description: 'Direct link to opt out', example: 'https://.../opt-out/token', required: true },
+    { name: 'matchingFrequency', description: 'How often matching occurs (weekly, bi-weekly, monthly)', example: 'monthly', required: false },
+    { name: 'nextMatchingDate', description: 'Date of the next scheduled matching round', example: 'February 1, 2026', required: false }
   ],
 
   pairing_notification: [
@@ -70,7 +76,13 @@ module.exports.variableDefinitions = {
     { name: 'partnerDepartment', description: 'Coffee partner\'s department', example: 'Marketing', required: false },
     { name: 'meetingDate', description: 'Scheduled meeting date/time', example: 'January 15, 2026', required: false },
     { name: 'icebreakers', description: 'Array of conversation starter topics', example: '["Topic 1", "Topic 2"]', required: false, type: 'array' },
-    { name: 'pairingId', description: 'Unique pairing identifier', example: '12345', required: true }
+    { name: 'icebreaker1', description: 'First conversation starter (computed from icebreakers)', example: 'Topic 1', required: false, computed: true },
+    { name: 'icebreaker2', description: 'Second conversation starter (computed from icebreakers)', example: 'Topic 2', required: false, computed: true },
+    { name: 'icebreaker3', description: 'Third conversation starter (computed from icebreakers)', example: 'Topic 3', required: false, computed: true },
+    { name: 'pairingId', description: 'Unique pairing identifier', example: '12345', required: true },
+    { name: 'pairingUrl', description: 'Link to pairing details page (computed)', example: 'https://.../pairings/12345', required: false, computed: true },
+    { name: 'matchingFrequency', description: 'How often matching occurs (weekly, bi-weekly, monthly)', example: 'monthly', required: false },
+    { name: 'nextMatchingDate', description: 'Date of the next scheduled matching round', example: 'February 1, 2026', required: false }
   ],
 
   meeting_reminder: [
@@ -78,14 +90,18 @@ module.exports.variableDefinitions = {
     { name: 'partnerName', description: 'Coffee partner\'s full name', example: 'Jordan Smith', required: true },
     { name: 'meetingDate', description: 'Scheduled meeting date/time', example: 'January 15, 2026', required: true },
     { name: 'daysUntil', description: 'Days until the meeting', example: '1', required: true },
+    { name: 'urgency', description: 'Meeting urgency text (computed: "tomorrow" or "in X days")', example: 'tomorrow', required: false, computed: true },
     { name: 'icebreakers', description: 'Array of conversation starter topics', example: '["Topic 1", "Topic 2"]', required: false, type: 'array' },
-    { name: 'pairingId', description: 'Unique pairing identifier', example: '12345', required: true }
+    { name: 'icebreakerList', description: 'Numbered list of icebreakers (computed)', example: '1. Topic 1\n\n2. Topic 2', required: false, computed: true },
+    { name: 'pairingId', description: 'Unique pairing identifier', example: '12345', required: true },
+    { name: 'pairingUrl', description: 'Link to pairing details page (computed)', example: 'https://.../pairings/12345', required: false, computed: true }
   ],
 
   feedback_request: [
     { name: 'userName', description: 'Recipient\'s first name', example: 'Alex', required: true },
     { name: 'partnerName', description: 'Coffee partner\'s full name', example: 'Jordan Smith', required: true },
-    { name: 'pairingId', description: 'Unique pairing identifier', example: '12345', required: true }
+    { name: 'pairingId', description: 'Unique pairing identifier', example: '12345', required: true },
+    { name: 'feedbackUrl', description: 'Link to feedback form (computed)', example: 'https://.../pairings/12345/feedback', required: false, computed: true }
   ]
 };
 
