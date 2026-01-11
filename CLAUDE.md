@@ -14,8 +14,8 @@ Coffee Roulette is an internal web application for Mercator IT Solutions that fa
 - **Database:** MySQL 8.0
 - **ORM:** Sequelize
 - **Authentication:** Passport.js with Azure AD OAuth 2.0, JWT tokens
-- **Scheduling:** node-cron
-- **Email:** AWS SES via Nodemailer
+- **Scheduling:** node-cron, cron-parser
+- **Email:** Microsoft Graph API (Mail.Send)
 - **Process Manager:** PM2
 - **Logging:** Winston (JSON format)
 
@@ -46,7 +46,7 @@ coffee-roulette/
 ├── frontend/
 │   └── src/
 │       ├── components/
-│       │   ├── matching/   # ScheduleConfig, ManualMatchingModal, etc.
+│       │   ├── matching/   # ScheduleConfig, ManualMatchingModal, MatchingRoundModal
 │       │   ├── portal/     # PartnerCard, FeedbackForm, IcebreakerList, EmptyState
 │       │   ├── templates/  # TemplateEditor
 │       │   └── users/      # UserDetailModal
@@ -115,13 +115,20 @@ npm test             # Run tests
 ## Database
 
 ### Key Tables
-- `users` - Employee data synced from Microsoft, includes `opt_out_token` for tokenised opt-out
+- `users` - Employee data synced from Microsoft:
+  - `opt_out_token` - UUID for tokenised opt-out
+  - `skip_grace_period` - Admin override to bypass 48h wait
+  - `available_from` - Future date for delayed participation
+  - `override_department_exclusion` - Include user even if dept inactive
+  - `matching_preference` - `any`, `cross_department_only`, `same_department_only`, `cross_seniority_only`
+  - `is_vip` - Guaranteed match (never sits out)
+  - `seniority_level` - `junior`, `mid`, `senior`, `lead`, `head`, `executive`
 - `departments` - Organisation units with `is_active` for phased rollout
-- `matching_rounds` - Monthly matching execution records
+- `matching_rounds` - Matching execution records with status tracking
 - `pairings` - User pairings with meeting details
 - `meeting_feedback` - User feedback and ratings
 - `notification_templates` - Custom email/Teams templates (with file fallback)
-- `system_settings` - Key-value configuration store
+- `system_settings` - Key-value configuration store (including schedule config)
 - `admin_users` - Admin role assignments
 
 ### Model Registration
@@ -140,8 +147,7 @@ Backend requires in `.env`:
 - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
 - `JWT_SECRET`
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
-- `EMAIL_FROM`
+- `EMAIL_SENDER_ADDRESS` - Mailbox for sending emails via Microsoft Graph (requires Mail.Send permission)
 
 Frontend requires in `.env`:
 - `REACT_APP_AZURE_CLIENT_ID`, `REACT_APP_AZURE_TENANT_ID`
@@ -151,12 +157,13 @@ Frontend requires in `.env`:
 
 1. **Admin Dashboard** - Analytics, user management, department controls
 2. **User Portal** - Employee-facing portal for viewing matches, confirming meetings, leaving feedback
-3. **Matching Algorithm** - Smart pairing with cross-department bonuses, repeat penalties
-4. **Configurable Schedule** - Weekly/biweekly/monthly matching with inline date/time editing
+3. **Matching Algorithm** - Smart pairing with cross-department bonuses, repeat penalties, VIP handling
+4. **Configurable Schedule** - Weekly/biweekly/monthly matching with inline date/time editing, manual trigger
 5. **Department Phased Rollout** - Enable departments gradually with auto opt-in
 6. **Tokenised Opt-Out** - One-click opt-out links without authentication
 7. **Template Management** - Monaco editor for customising email/Teams templates
-8. **Microsoft Integration** - User sync, calendar events, Teams notifications
+8. **Microsoft Integration** - User sync, calendar events, Teams notifications, email via Graph API
+9. **Admin User Overrides** - Skip grace period, set availability dates, VIP status, matching preferences
 
 ## Testing
 

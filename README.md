@@ -22,8 +22,8 @@ Coffee Roulette automatically pairs employees monthly for casual coffee meetings
 - **Database**: MySQL 8.0
 - **ORM**: Sequelize
 - **Authentication**: Passport.js with Azure AD OAuth 2.0
-- **Scheduling**: node-cron
-- **Email**: AWS SES via Nodemailer
+- **Scheduling**: node-cron, cron-parser
+- **Email**: Microsoft Graph API (Mail.Send)
 - **API Integration**: Microsoft Graph API
 
 ### Frontend
@@ -37,7 +37,7 @@ Coffee Roulette automatically pairs employees monthly for casual coffee meetings
 - **Containerisation**: Docker
 - **Orchestration**: Kubernetes (AWS EKS)
 - **Database**: MySQL container (with RDS migration path)
-- **Email Service**: AWS SES
+- **Email Service**: Microsoft Graph API
 - **CI/CD**: GitHub Actions
 
 ## Project Structure
@@ -133,10 +133,8 @@ DB_PASSWORD=your_secure_password
 # JWT Secret
 JWT_SECRET=your_jwt_secret_key
 
-# AWS SES
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-EMAIL_FROM=noreply@your-company.com
+# Email (Microsoft Graph)
+EMAIL_SENDER_ADDRESS=noreply@your-company.com
 ```
 
 ### 3. Azure AD App Registration
@@ -151,15 +149,14 @@ EMAIL_FROM=noreply@your-company.com
 5. After creation, note the **Application (client) ID** and **Directory (tenant) ID**
 6. Create a **Client Secret** under Certificates & secrets
 7. Grant API permissions:
-   - Microsoft Graph: `User.Read`, `Calendars.ReadWrite`, `People.Read`
+   - Microsoft Graph: `User.Read`, `Calendars.ReadWrite`, `People.Read`, `Mail.Send` (Application)
 
-### 4. AWS SES Setup
+### 4. Email Setup (Microsoft Graph)
 
-1. Go to [AWS SES Console](https://console.aws.amazon.com/ses/)
-2. Verify your sender email address
-3. Request production access (to send to any email)
-4. Create IAM user with SES send permissions
-5. Note the Access Key ID and Secret Access Key
+Email is sent via Microsoft Graph API using the `Mail.Send` application permission:
+1. Ensure `Mail.Send` is granted as an Application permission in Azure AD
+2. Grant admin consent for the permission
+3. Set `EMAIL_SENDER_ADDRESS` to a valid mailbox in your tenant (e.g., `noreply@your-company.com`)
 
 ### 5. Start with Docker Compose
 
@@ -291,7 +288,11 @@ npm run build
 
 Key tables:
 - **users**: Employee information synced from Microsoft
-  - Includes `opt_out_token` (UUID for tokenised opt-out), `opted_in_at`, `opted_out_at`, `welcome_sent_at`
+  - `opt_out_token` (UUID for tokenised opt-out), `opted_in_at`, `opted_out_at`, `welcome_sent_at`
+  - `skip_grace_period`, `available_from`, `override_department_exclusion` - Admin overrides
+  - `matching_preference` - User matching preferences (`any`, `cross_department_only`, etc.)
+  - `is_vip` - VIP users are guaranteed matches (never sit out)
+  - `seniority_level` - `junior`, `mid`, `senior`, `lead`, `head`, `executive`
 - **departments**: Organization departments with enrollment status
   - `is_active` controls whether department users are eligible for matching
   - `enrollment_date` records when department was first enabled
@@ -379,21 +380,26 @@ Users have three participation statuses:
 
 The pairing algorithm:
 1. Fetches eligible participants (opted-in, active, department enabled, past grace period)
+   - Respects `available_from` date for delayed participation
+   - Honours `override_department_exclusion` for users in inactive departments
+   - Skips grace period if `skip_grace_period` is set
 2. Checks recent pairings (last 3 rounds)
 3. Scores potential matches:
    - **-50 points** per recent pairing (penalty)
    - **+20 points** for cross-department matching (bonus)
    - **+10 points** for cross-seniority matching (bonus)
+   - Respects user `matching_preference` settings
 4. Selects highest-scoring matches
 5. Handles odd numbers (one person sits out, prioritised next round)
+   - VIP users (`is_vip = true`) are guaranteed a match
 6. Assigns random icebreaker topics
 
-**Grace Period**: Users who opted in within the last 48 hours are excluded from matching, giving them time to opt-out if desired. This is configurable via `matching.grace_period_hours`.
+**Grace Period**: Users who opted in within the last 48 hours are excluded from matching, giving them time to opt-out if desired. This is configurable via `matching.grace_period_hours`. Admins can bypass this per-user with `skip_grace_period`.
 
 ### Automated Jobs
 
-Configured via node-cron:
-- **Monthly Matching**: 1st of month at 9 AM
+Configured via node-cron with dynamic scheduling:
+- **Matching Rounds**: Configurable (weekly, bi-weekly, or monthly) with manual trigger option
 - **Notification Queue**: Every 5 minutes
 - **Meeting Reminders**: 7 days and 1 day before
 - **Feedback Requests**: 1 day after scheduled meeting
@@ -401,7 +407,7 @@ Configured via node-cron:
 
 ### Notifications
 
-- **Email**: AWS SES with HTML templates
+- **Email**: Microsoft Graph API with HTML templates
 - **Microsoft Teams**: Webhook integration with adaptive cards
 - **Queue-based**: Reliable delivery with retry logic
 
@@ -466,7 +472,9 @@ Admins can customise email and Teams notification templates via the admin dashbo
 System settings (stored in `system_settings` table):
 
 ```
-matching.frequency=monthly
+matching.schedule_type=monthly
+matching.auto_schedule_enabled=true
+matching.next_run_date=2026-02-01
 matching.lookback_rounds=3
 matching.cross_department_weight=20
 matching.cross_seniority_weight=10
@@ -478,7 +486,9 @@ calendar.meeting_duration_minutes=30
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `matching.frequency` | monthly | How often matching runs |
+| `matching.schedule_type` | monthly | Schedule preset: `weekly`, `biweekly`, or `monthly` |
+| `matching.auto_schedule_enabled` | true | Enable automatic scheduled matching |
+| `matching.next_run_date` | (calculated) | Next scheduled matching run date |
 | `matching.lookback_rounds` | 3 | Number of previous rounds to check for repeat pairings |
 | `matching.cross_department_weight` | 20 | Bonus points for cross-department matches |
 | `matching.cross_seniority_weight` | 10 | Bonus points for cross-seniority matches |

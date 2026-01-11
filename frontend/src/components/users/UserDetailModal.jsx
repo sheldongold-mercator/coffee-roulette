@@ -21,8 +21,8 @@ import { userAPI, departmentAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const seniorityLevels = [
-  { value: 'junior', label: 'Junior' },
-  { value: 'mid', label: 'Mid-Level' },
+  { value: 'junior', label: 'Apprentice' },
+  { value: 'mid', label: 'Practitioner' },
   { value: 'senior', label: 'Senior' },
   { value: 'lead', label: 'Lead' },
   { value: 'head', label: 'Head' },

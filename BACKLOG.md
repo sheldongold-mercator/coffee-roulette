@@ -113,14 +113,16 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Location:** `backend/src/controllers/userController.js`, `backend/src/services/notificationService.js`
 
 ### 22. Remove Experience Level Self-Service for Users
-- [ ] **Type:** Enhancement
+- [x] **Type:** Enhancement
 - **Description:** Non-admin users should not be able to set their own Experience Level (seniority) in the Portal. This should only be editable by admins in the User Details modal.
 - **Location:** `frontend/src/pages/portal/Profile.jsx`
+- **Completed:** Removed seniority level selection section from Profile page entirely
 
 ### 23. Move "How Coffee Roulette Works" Section
-- [ ] **Type:** Enhancement
+- [x] **Type:** Enhancement
 - **Description:** Remove the "How Coffee Roulette Works" section from the Profile page in the Portal. Add this information to the card on the Portal Home page instead.
 - **Location:** `frontend/src/pages/portal/Profile.jsx`, `frontend/src/pages/portal/PortalHome.jsx`
+- **Completed:** Removed from Profile, added to PortalHome shown for pending pairings
 
 ### 24. Replace Total Users with Eligible Users on Dashboard
 - [ ] **Type:** Enhancement
@@ -149,9 +151,10 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Location:** `backend/src/controllers/adminAnalyticsController.js`, `frontend/src/pages/Dashboard.jsx`
 
 ### 25. Rename Seniority Level Labels
-- [ ] **Type:** Enhancement
+- [x] **Type:** Enhancement
 - **Description:** In the User Details modal Seniority Level dropdown, rename "Junior" to "Apprentice" and "Mid-Level" to "Practitioner". Update both frontend labels and backend enum values if needed.
 - **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/models/User.js`
+- **Completed:** Updated labels in UserDetailModal and ManualMatchingModal (backend values unchanged as they're DB enum values)
 
 ---
 

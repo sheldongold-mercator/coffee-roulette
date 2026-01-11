@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import {
@@ -12,24 +12,10 @@ import {
 import { portalAPI } from '../../services/portalAPI';
 import toast from 'react-hot-toast';
 
-const seniorityLevels = [
-  { value: 'junior', label: 'Junior', description: '0-2 years experience' },
-  { value: 'mid', label: 'Mid-Level', description: '2-5 years experience' },
-  { value: 'senior', label: 'Senior', description: '5-8 years experience' },
-  { value: 'lead', label: 'Lead', description: '8+ years, leadership role' },
-  { value: 'head', label: 'Head', description: 'Head of department/function' },
-  { value: 'executive', label: 'Executive', description: 'Director and above' },
-];
-
 const Profile = () => {
   const queryClient = useQueryClient();
-  const [selectedSeniority, setSelectedSeniority] = useState(null);
 
-  const { data, isLoading } = useQuery('profile', () => portalAPI.getProfile(), {
-    onSuccess: (data) => {
-      setSelectedSeniority(data?.data?.user?.seniorityLevel || null);
-    },
-  });
+  const { data, isLoading } = useQuery('profile', () => portalAPI.getProfile());
 
   const profile = data?.data?.user;
 
@@ -56,25 +42,6 @@ const Profile = () => {
       toast.error(error.response?.data?.message || 'Failed to opt out');
     },
   });
-
-  // Update profile mutation
-  const updateMutation = useMutation(
-    (data) => portalAPI.updateProfile(data),
-    {
-      onSuccess: () => {
-        toast.success('Profile updated!');
-        queryClient.invalidateQueries('profile');
-      },
-      onError: (error) => {
-        toast.error(error.response?.data?.message || 'Failed to update profile');
-      },
-    }
-  );
-
-  const handleSeniorityChange = (value) => {
-    setSelectedSeniority(value);
-    updateMutation.mutate({ seniorityLevel: value });
-  };
 
   // Loading skeleton
   if (isLoading) {
@@ -232,75 +199,6 @@ const Profile = () => {
         </div>
       </motion.div>
 
-      {/* Seniority Level */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="bg-white rounded-2xl shadow-sm border border-amber-100 p-8"
-      >
-        <h3 className="text-xl font-bold text-gray-900 mb-2">
-          Experience Level
-        </h3>
-        <p className="text-gray-500 mb-6">
-          This helps us create diverse pairings across experience levels
-        </p>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {seniorityLevels.map((level) => (
-            <button
-              key={level.value}
-              onClick={() => handleSeniorityChange(level.value)}
-              disabled={updateMutation.isLoading}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${
-                selectedSeniority === level.value
-                  ? 'border-amber-500 bg-amber-50'
-                  : 'border-gray-200 hover:border-amber-300'
-              } disabled:opacity-50`}
-            >
-              <p className="font-semibold text-gray-900">{level.label}</p>
-              <p className="text-sm text-gray-500">{level.description}</p>
-            </button>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Info Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-2xl border border-amber-100 p-8"
-      >
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-white rounded-xl shadow-sm">
-            <span className="text-2xl">&#128161;</span>
-          </div>
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-2">
-              How Coffee Roulette Works
-            </h4>
-            <ul className="text-gray-600 space-y-2">
-              <li className="flex items-start gap-2">
-                <span className="text-amber-500 font-bold">1.</span>
-                Each month, you're randomly paired with a colleague
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-500 font-bold">2.</span>
-                You'll receive an email with your match and conversation starters
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-500 font-bold">3.</span>
-                Schedule a 30-minute coffee chat (virtual or in-person)
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-500 font-bold">4.</span>
-                After your meeting, confirm and share feedback
-              </li>
-            </ul>
-          </div>
-        </div>
-      </motion.div>
     </div>
   );
 };

@@ -182,6 +182,45 @@ const PortalHome = () => {
         <IcebreakerList icebreakers={pairing.icebreakers} />
       )}
 
+      {/* How It Works - Show for pending pairings to help new users */}
+      {isPending && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-2xl border border-amber-100 p-6"
+        >
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 bg-white rounded-xl shadow-sm">
+              <span className="text-xl">&#128161;</span>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-3">
+                How Coffee Roulette Works
+              </h4>
+              <div className="grid sm:grid-cols-2 gap-3 text-sm text-gray-600">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">1.</span>
+                  <span>Reach out to your partner via email or Teams</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">2.</span>
+                  <span>Schedule a 30-minute coffee chat together</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">3.</span>
+                  <span>Meet up virtually or in-person - your choice!</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">4.</span>
+                  <span>Click "We Had Our Coffee" when you're done</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Action Buttons */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
