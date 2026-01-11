@@ -23,7 +23,7 @@ const rawHtml = `
     .icebreakers li { margin: 8px 0; }
     .tips { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
     .tips h3 { margin-top: 0; color: #1565c0; }
-    .cta-button { display: inline-block; background: #f5576c; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+    .cta-button { display: inline-block; background: #f5576c; background-color: #f5576c; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
     .footer { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none; color: #666; font-size: 14px; }
   </style>
 </head>
@@ -56,7 +56,7 @@ const rawHtml = `
         <li>Have fun and enjoy getting to know your colleague!</li>
       </ul>
     </div>
-    <p style="margin-top: 30px;"><a href="\${pairingUrl}" class="cta-button">View Meeting Details</a></p>
+    <p style="margin-top: 30px;"><a href="\${pairingUrl}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">View Meeting Details</a></p>
   </div>
   <div class="footer">
     <p>This is an automated reminder from Coffee Roulette.</p>
@@ -182,7 +182,8 @@ module.exports = ({ userName, partnerName, meetingDate, daysUntil, icebreakers, 
     .cta-button {
       display: inline-block;
       background: #f5576c;
-      color: white;
+      background-color: #f5576c;
+      color: #ffffff !important;
       padding: 12px 30px;
       text-decoration: none;
       border-radius: 5px;
@@ -239,7 +240,7 @@ module.exports = ({ userName, partnerName, meetingDate, daysUntil, icebreakers, 
     </div>
 
     <p style="margin-top: 30px;">
-      <a href="${pairingUrl}" class="cta-button">
+      <a href="${pairingUrl}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">
         View Meeting Details
       </a>
     </p>

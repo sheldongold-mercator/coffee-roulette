@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import {
   HomeIcon,
   ClockIcon,
-  UserCircleIcon,
   ArrowRightOnRectangleIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
@@ -13,7 +12,6 @@ import { useAuth } from '../../contexts/AuthContext';
 const navigation = [
   { name: 'Home', href: '/portal', icon: HomeIcon },
   { name: 'History', href: '/portal/history', icon: ClockIcon },
-  { name: 'Profile', href: '/portal/profile', icon: UserCircleIcon },
 ];
 
 const PortalLayout = () => {
@@ -76,12 +74,18 @@ const PortalLayout = () => {
                 </NavLink>
               )}
               <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
-                <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full text-white font-medium text-sm">
-                  {user?.firstName?.charAt(0) || user?.displayName?.charAt(0) || 'U'}
-                </div>
-                <span className="hidden sm:block text-sm font-medium text-gray-700">
-                  {user?.firstName || user?.displayName?.split(' ')[0] || 'User'}
-                </span>
+                <NavLink
+                  to="/portal/profile"
+                  className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-amber-50 transition-colors"
+                  title="View Profile"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full text-white font-medium text-sm">
+                    {user?.firstName?.charAt(0) || user?.displayName?.charAt(0) || 'U'}
+                  </div>
+                  <span className="hidden sm:block text-sm font-medium text-gray-700 hover:text-amber-600">
+                    {user?.firstName || user?.displayName?.split(' ')[0] || 'User'}
+                  </span>
+                </NavLink>
                 <button
                   onClick={handleLogout}
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"

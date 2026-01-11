@@ -1,4 +1,4 @@
-const { User, Pairing, MeetingFeedback } = require('../models');
+const { User, Pairing, MeetingFeedback, MatchingRound } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 
@@ -215,9 +215,13 @@ const getPairings = async (req, res) => {
       };
     });
 
+    // Get total matching rounds in the system
+    const totalRounds = await MatchingRound.count();
+
     res.json({
       pairings: formattedPairings,
       total: pairings.count,
+      totalRounds,
       limit: parseInt(limit, 10),
       offset: parseInt(offset, 10)
     });
@@ -244,7 +248,7 @@ const getCurrentPairing = async (req, res) => {
           { user2_id: user.id }
         ],
         status: {
-          [Op.in]: ['pending', 'confirmed']
+          [Op.in]: ['pending', 'confirmed', 'completed']
         }
       },
       include: [
@@ -266,6 +270,12 @@ const getCurrentPairing = async (req, res) => {
           association: 'icebreakers',
           attributes: ['id', 'topic', 'category'],
           through: { attributes: [] }
+        },
+        {
+          association: 'feedback',
+          where: { user_id: user.id },
+          required: false,
+          attributes: ['id', 'rating', 'comments', 'topics_discussed']
         }
       ],
       order: [['created_at', 'DESC']]
@@ -279,6 +289,7 @@ const getCurrentPairing = async (req, res) => {
     }
 
     const partner = pairing.user1_id === user.id ? pairing.user2 : pairing.user1;
+    const userFeedback = pairing.feedback && pairing.feedback.length > 0 ? pairing.feedback[0] : null;
 
     res.json({
       pairing: {
@@ -303,6 +314,12 @@ const getCurrentPairing = async (req, res) => {
           topic: ib.topic,
           category: ib.category
         })),
+        feedback: userFeedback ? {
+          id: userFeedback.id,
+          rating: userFeedback.rating,
+          comments: userFeedback.comments,
+          topicsDiscussed: userFeedback.topics_discussed
+        } : null,
         createdAt: pairing.created_at
       }
     });

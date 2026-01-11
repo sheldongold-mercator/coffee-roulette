@@ -6,6 +6,10 @@ import {
   BuildingOfficeIcon,
   UserGroupIcon,
   ChartBarIcon,
+  ExclamationTriangleIcon,
+  EnvelopeIcon,
+  CheckCircleIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { departmentAPI } from '../services/api';
 import toast from 'react-hot-toast';
@@ -86,6 +90,7 @@ const Departments = () => {
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
+  const [confirmDepartment, setConfirmDepartment] = useState(null);
 
   const { data: departmentsData, isLoading } = useQuery(['departments', 'v2'], () =>
     departmentAPI.getDepartments()
@@ -123,10 +128,26 @@ const Departments = () => {
   );
 
   const handleToggle = (department) => {
-    toggleMutation.mutate({
-      id: department.id,
-      isEnabled: department.isEnabled,
-    });
+    if (department.isEnabled) {
+      // Disable immediately - no confirmation needed
+      toggleMutation.mutate({
+        id: department.id,
+        isEnabled: true,
+      });
+    } else {
+      // Show confirmation modal for enabling
+      setConfirmDepartment(department);
+    }
+  };
+
+  const handleConfirmEnable = () => {
+    if (confirmDepartment) {
+      toggleMutation.mutate({
+        id: confirmDepartment.id,
+        isEnabled: false,
+      });
+      setConfirmDepartment(null);
+    }
   };
 
   const handleCreate = (e) => {
@@ -322,6 +343,103 @@ const Departments = () => {
                 </button>
               </div>
             </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Enable Department Confirmation Modal */}
+      {confirmDepartment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-4"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-12 h-12 bg-amber-100 rounded-full">
+                <ExclamationTriangleIcon className="w-6 h-6 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Enable {confirmDepartment.name}?
+                </h2>
+                <p className="text-sm text-gray-500">
+                  This will activate Coffee Roulette for this department
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <p className="text-sm font-medium text-gray-900 mb-3">
+                The following will happen when you enable this department:
+              </p>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-blue-100 rounded-full mt-0.5">
+                    <UserGroupIcon className="w-3.5 h-3.5 text-blue-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {confirmDepartment.totalUsers || 0} users
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      {' '}will be automatically opted into Coffee Roulette
+                    </span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-green-100 rounded-full mt-0.5">
+                    <EnvelopeIcon className="w-3.5 h-3.5 text-green-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">Welcome emails</span>
+                    <span className="text-sm text-gray-600">
+                      {' '}will be sent to all users explaining the program
+                    </span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-purple-100 rounded-full mt-0.5">
+                    <ClockIcon className="w-3.5 h-3.5 text-purple-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">48-hour grace period</span>
+                    <span className="text-sm text-gray-600">
+                      {' '}before users are included in matching
+                    </span>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-amber-100 rounded-full mt-0.5">
+                    <CheckCircleIcon className="w-3.5 h-3.5 text-amber-600" />
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      Users can opt out at any time via the email link
+                    </span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmDepartment(null)}
+                className="btn btn-secondary"
+                disabled={toggleMutation.isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmEnable}
+                className="btn btn-primary"
+                disabled={toggleMutation.isLoading}
+              >
+                {toggleMutation.isLoading ? 'Enabling...' : 'Enable Department'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}

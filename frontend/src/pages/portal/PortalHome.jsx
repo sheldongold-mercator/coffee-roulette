@@ -174,14 +174,13 @@ const PortalHome = () => {
         </motion.div>
       )}
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Partner Card */}
-        <PartnerCard partner={pairing.partner} />
+      {/* Partner Card - Full Width */}
+      <PartnerCard partner={pairing.partner} />
 
-        {/* Icebreakers */}
+      {/* Icebreakers - Only show if available */}
+      {pairing.icebreakers && pairing.icebreakers.length > 0 && (
         <IcebreakerList icebreakers={pairing.icebreakers} />
-      </div>
+      )}
 
       {/* Action Buttons */}
       <motion.div
@@ -190,7 +189,7 @@ const PortalHome = () => {
         transition={{ delay: 0.3 }}
         className="flex flex-col sm:flex-row gap-4"
       >
-        {!isCompleted && (
+        {!isCompleted ? (
           <button
             onClick={() => confirmMutation.mutate(pairing.id)}
             disabled={confirmMutation.isLoading}
@@ -208,19 +207,15 @@ const PortalHome = () => {
               </>
             )}
           </button>
+        ) : (
+          <button
+            onClick={() => setShowFeedback(true)}
+            className="flex-1 inline-flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-2xl shadow-lg shadow-amber-200 hover:shadow-xl hover:shadow-amber-300 transform hover:-translate-y-0.5 transition-all"
+          >
+            <ChatBubbleBottomCenterTextIcon className="w-6 h-6" />
+            {pairing.feedback ? 'Change Feedback' : 'Share Your Feedback'}
+          </button>
         )}
-
-        <button
-          onClick={() => setShowFeedback(true)}
-          className={`flex-1 inline-flex items-center justify-center gap-3 px-6 py-4 font-semibold rounded-2xl transition-all ${
-            isCompleted
-              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-200 hover:shadow-xl hover:shadow-amber-300 transform hover:-translate-y-0.5'
-              : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-amber-300 hover:text-amber-600'
-          }`}
-        >
-          <ChatBubbleBottomCenterTextIcon className="w-6 h-6" />
-          {isCompleted ? 'Share Your Feedback' : 'Leave Feedback'}
-        </button>
       </motion.div>
 
       {/* Completed State - Encouragement */}
@@ -249,6 +244,7 @@ const PortalHome = () => {
           <FeedbackForm
             pairingId={pairing.id}
             partnerName={pairing.partner?.firstName}
+            existingFeedback={pairing.feedback}
             onClose={() => setShowFeedback(false)}
             onSuccess={() => setShowFeedback(false)}
           />

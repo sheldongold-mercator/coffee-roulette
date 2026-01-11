@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ClockIcon,
   CalendarIcon,
-  CheckCircleIcon,
-  PencilIcon,
+  ClockIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { matchingAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -13,33 +12,33 @@ import { format } from 'date-fns';
 
 const ScheduleConfig = () => {
   const queryClient = useQueryClient();
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedType, setSelectedType] = useState('monthly');
-  const [nextRunDate, setNextRunDate] = useState('');
-  const [nextRunTime, setNextRunTime] = useState('09:00');
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+  const [editingDate, setEditingDate] = useState(false);
+  const [editingTime, setEditingTime] = useState(false);
+  const dropdownRef = useRef(null);
+  const dateInputRef = useRef(null);
+  const timeInputRef = useRef(null);
 
   const { data: scheduleData, isLoading } = useQuery(
     ['matching-schedule'],
     () => matchingAPI.getSchedule()
   );
 
-  // Memoize config extraction to avoid repetition
   const config = useMemo(
     () => scheduleData?.data?.data || scheduleData?.data || {},
     [scheduleData]
   );
 
-  // Update local state when config changes
-  React.useEffect(() => {
-    if (config.scheduleType) {
-      setSelectedType(config.scheduleType);
-    }
-    if (config.nextRunDate) {
-      const date = new Date(config.nextRunDate);
-      setNextRunDate(format(date, 'yyyy-MM-dd'));
-      setNextRunTime(format(date, 'HH:mm'));
-    }
-  }, [config]);
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowTypeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const updateScheduleMutation = useMutation(
     (data) => matchingAPI.updateSchedule(data),
@@ -51,9 +50,8 @@ const ScheduleConfig = () => {
         if (data?.jobActive === false) {
           toast.success('Schedule saved! Will take effect after server restart.', { duration: 5000 });
         } else {
-          toast.success('Schedule updated successfully!');
+          toast.success('Schedule updated');
         }
-        setIsEditing(false);
       },
       onError: (error) => {
         toast.error(error.response?.data?.message || 'Failed to update schedule');
@@ -64,9 +62,9 @@ const ScheduleConfig = () => {
   const toggleAutoScheduleMutation = useMutation(
     (enabled) => matchingAPI.toggleAutoSchedule(enabled),
     {
-      onSuccess: () => {
+      onSuccess: (_, enabled) => {
         queryClient.invalidateQueries('matching-schedule');
-        toast.success('Auto-scheduling toggled successfully!');
+        toast.success(enabled ? 'Automatic matching enabled' : 'Automatic matching disabled');
       },
       onError: (error) => {
         toast.error(error.response?.data?.message || 'Failed to toggle auto-scheduling');
@@ -74,41 +72,77 @@ const ScheduleConfig = () => {
     }
   );
 
-  const handleSave = () => {
-    if (!nextRunDate) {
-      toast.error('Please select the next scheduled run date');
-      return;
-    }
-
-    // Combine date and time
-    const scheduledDateTime = new Date(`${nextRunDate}T${nextRunTime}`);
-
-    if (scheduledDateTime <= new Date()) {
-      toast.error('Next scheduled run must be in the future');
-      return;
-    }
-
-    updateScheduleMutation.mutate({
-      scheduleType: selectedType,
-      nextRunDate: scheduledDateTime.toISOString(),
-    });
-  };
-
-  const handleCancel = () => {
-    setSelectedType(config.scheduleType || 'monthly');
-    if (config.nextRunDate) {
-      const date = new Date(config.nextRunDate);
-      setNextRunDate(format(date, 'yyyy-MM-dd'));
-      setNextRunTime(format(date, 'HH:mm'));
-    }
-    setIsEditing(false);
-  };
-
   const scheduleTypeOptions = [
-    { value: 'weekly', label: 'Weekly', description: 'Repeats every week on the same day' },
-    { value: 'biweekly', label: 'Bi-weekly', description: 'Repeats every two weeks' },
-    { value: 'monthly', label: 'Monthly', description: 'Repeats every month on the same day' },
+    { value: 'weekly', label: 'Weekly', description: 'Every week on the same day' },
+    { value: 'biweekly', label: 'Bi-weekly', description: 'Every two weeks' },
+    { value: 'monthly', label: 'Monthly', description: 'Every month on the same day' },
   ];
+
+  const handleToggle = () => {
+    if (!toggleAutoScheduleMutation.isLoading) {
+      toggleAutoScheduleMutation.mutate(!config.enabled);
+    }
+  };
+
+  const handleScheduleTypeChange = (newType) => {
+    setShowTypeDropdown(false);
+    if (newType !== config.scheduleType) {
+      updateScheduleMutation.mutate({
+        scheduleType: newType,
+        nextRunDate: config.nextRunDate,
+      });
+    }
+  };
+
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    if (newDate && config.nextRunDate) {
+      const currentDate = new Date(config.nextRunDate);
+      const [year, month, day] = newDate.split('-').map(Number);
+      const newDateTime = new Date(currentDate);
+      newDateTime.setFullYear(year, month - 1, day);
+
+      const now = new Date();
+      if (newDateTime > now) {
+        updateScheduleMutation.mutate({
+          scheduleType: config.scheduleType,
+          nextRunDate: newDateTime.toISOString(),
+        });
+      } else {
+        // Check if user selected today - if so, they need to also update the time
+        const isToday = newDateTime.toDateString() === now.toDateString();
+        if (isToday) {
+          toast.error('For today\'s date, please also set a time later than now');
+        } else {
+          toast.error('Date must be in the future');
+        }
+      }
+    }
+    setEditingDate(false);
+  };
+
+  const handleTimeChange = (e) => {
+    const newTime = e.target.value;
+    if (newTime && config.nextRunDate) {
+      const currentDate = new Date(config.nextRunDate);
+      const [hours, minutes] = newTime.split(':').map(Number);
+      const newDateTime = new Date(currentDate);
+      newDateTime.setHours(hours, minutes, 0, 0);
+
+      if (newDateTime > new Date()) {
+        updateScheduleMutation.mutate({
+          scheduleType: config.scheduleType,
+          nextRunDate: newDateTime.toISOString(),
+        });
+      } else {
+        toast.error('Time must be in the future');
+      }
+    }
+    setEditingTime(false);
+  };
+
+  const currentTypeOption = scheduleTypeOptions.find(o => o.value === config.scheduleType) || scheduleTypeOptions[2];
+  const nextRunDate = config.nextRunDate ? new Date(config.nextRunDate) : null;
 
   if (isLoading) {
     return (
@@ -127,157 +161,173 @@ const ScheduleConfig = () => {
       animate={{ opacity: 1, y: 0 }}
       className="card"
     >
-      <div className="flex items-center justify-between mb-4">
+      {/* Header with Toggle */}
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 bg-sky-50 rounded-lg">
             <CalendarIcon className="w-5 h-5 text-sky-600" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Schedule Configuration</h3>
-            <p className="text-sm text-gray-500">Configure automatic matching schedule</p>
+            <h3 className="text-lg font-semibold text-gray-900">Matching Schedule</h3>
+            <p className="text-sm text-gray-500">Configure when automatic matching runs</p>
           </div>
         </div>
-        {!isEditing && (
+
+        {/* iOS-style Toggle */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-gray-700">
+            {config.enabled ? 'Enabled' : 'Disabled'}
+          </span>
           <button
-            onClick={() => setIsEditing(true)}
-            className="btn btn-secondary btn-sm"
+            type="button"
+            role="switch"
+            aria-checked={config.enabled}
+            aria-label="Toggle automatic matching"
+            onClick={handleToggle}
+            disabled={toggleAutoScheduleMutation.isLoading}
+            data-enabled={config.enabled ? "true" : "false"}
+            className="toggle-switch"
           >
-            <PencilIcon className="w-4 h-4" />
-            Edit
+            <span className="toggle-switch-knob" />
           </button>
-        )}
+        </div>
       </div>
 
-      {isEditing ? (
-        <div className="space-y-4">
-          {/* Schedule Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Schedule Type
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {scheduleTypeOptions.map((option) => (
+      {/* Schedule Settings */}
+      <AnimatePresence>
+        {config.enabled && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-4 overflow-hidden"
+          >
+            {/* Schedule Type */}
+            <div className="flex items-center justify-between py-3 border-t border-gray-100">
+              <div className="flex items-center gap-3">
+                <ClockIcon className="w-5 h-5 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">Schedule Type</span>
+              </div>
+
+              <div className="relative" ref={dropdownRef}>
                 <button
-                  key={option.value}
-                  onClick={() => setSelectedType(option.value)}
-                  className={`p-3 rounded-lg border-2 transition-colors text-left ${
-                    selectedType === option.value
-                      ? 'border-sky-500 bg-sky-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                  onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                  disabled={updateScheduleMutation.isLoading}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  <div className="font-medium text-gray-900">
-                    {option.label}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    {option.description}
-                  </div>
+                  {currentTypeOption.label}
+                  <ChevronDownIcon className={`w-4 h-4 text-gray-500 transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
                 </button>
-              ))}
-            </div>
-          </div>
 
-          {/* Next Scheduled Run - Date & Time Picker */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Next Scheduled Run
-            </label>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <input
-                  type="date"
-                  value={nextRunDate}
-                  onChange={(e) => setNextRunDate(e.target.value)}
-                  min={format(new Date(), 'yyyy-MM-dd')}
-                  className="input w-full"
-                />
-              </div>
-              <div className="w-32">
-                <input
-                  type="time"
-                  value={nextRunTime}
-                  onChange={(e) => setNextRunTime(e.target.value)}
-                  className="input w-full"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Subsequent runs will repeat {selectedType === 'weekly' ? 'every week' : selectedType === 'biweekly' ? 'every two weeks' : 'every month'} from this date
-            </p>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              onClick={handleSave}
-              disabled={updateScheduleMutation.isLoading}
-              className="btn btn-primary"
-            >
-              {updateScheduleMutation.isLoading ? 'Saving...' : 'Save Changes'}
-            </button>
-            <button
-              onClick={handleCancel}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <ClockIcon className="w-4 h-4" />
-                Schedule Type
-              </div>
-              <div className="font-semibold text-gray-900 capitalize">
-                {config.scheduleType === 'biweekly' ? 'Bi-weekly' : config.scheduleType || 'Monthly'}
+                <AnimatePresence>
+                  {showTypeDropdown && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10"
+                    >
+                      {scheduleTypeOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => handleScheduleTypeChange(option.value)}
+                          aria-label={`Schedule matching ${option.label.toLowerCase()}`}
+                          className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors ${
+                            option.value === config.scheduleType ? 'bg-sky-50' : ''
+                          }`}
+                        >
+                          <div className={`text-sm font-medium ${option.value === config.scheduleType ? 'text-sky-700' : 'text-gray-900'}`}>
+                            {option.label}
+                          </div>
+                          <div className="text-xs text-gray-500">{option.description}</div>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <CalendarIcon className="w-4 h-4" />
-                Next Scheduled Run
+            {/* Next Scheduled Run */}
+            <div className="flex items-center justify-between py-3 border-t border-gray-100">
+              <div className="flex items-center gap-3">
+                <CalendarIcon className="w-5 h-5 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">Next Run</span>
               </div>
-              <div className="font-semibold text-gray-900">
-                {config.nextRunDate
-                  ? format(new Date(config.nextRunDate), 'MMM d, yyyy h:mm a')
-                  : 'Not scheduled'}
-              </div>
-            </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <CheckCircleIcon className="w-4 h-4" />
-                Status
-              </div>
               <div className="flex items-center gap-2">
-                <span
-                  className={`inline-block w-2 h-2 rounded-full ${
-                    config.enabled ? 'bg-green-500' : 'bg-gray-400'
-                  }`}
-                />
-                <span className="font-semibold text-gray-900">
-                  {config.enabled ? 'Enabled' : 'Disabled'}
-                </span>
+                {/* Date */}
+                <div className="relative">
+                  {editingDate ? (
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      defaultValue={nextRunDate ? format(nextRunDate, 'yyyy-MM-dd') : ''}
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      onChange={handleDateChange}
+                      onBlur={() => setEditingDate(false)}
+                      autoFocus
+                      className="input text-sm py-1.5 px-3 w-36"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingDate(true);
+                        setTimeout(() => dateInputRef.current?.showPicker?.(), 50);
+                      }}
+                      disabled={updateScheduleMutation.isLoading}
+                      className="px-3 py-1.5 text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      {nextRunDate ? format(nextRunDate, 'MMM d, yyyy') : 'Not set'}
+                    </button>
+                  )}
+                </div>
+
+                <span className="text-gray-300">|</span>
+
+                {/* Time */}
+                <div className="relative">
+                  {editingTime ? (
+                    <input
+                      ref={timeInputRef}
+                      type="time"
+                      defaultValue={nextRunDate ? format(nextRunDate, 'HH:mm') : '09:00'}
+                      onChange={handleTimeChange}
+                      onBlur={() => setEditingTime(false)}
+                      autoFocus
+                      className="input text-sm py-1.5 px-3 w-24"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingTime(true);
+                        setTimeout(() => timeInputRef.current?.showPicker?.(), 50);
+                      }}
+                      disabled={updateScheduleMutation.isLoading}
+                      className="px-3 py-1.5 text-sm font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      {nextRunDate ? format(nextRunDate, 'h:mm a') : '9:00 AM'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4 pt-4 border-t border-gray-200">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.enabled || false}
-                onChange={(e) => toggleAutoScheduleMutation.mutate(e.target.checked)}
-                disabled={toggleAutoScheduleMutation.isLoading}
-                className="rounded border-gray-300 text-sky-600 focus:ring-sky-500"
-              />
-              <span className="text-sm text-gray-700">Enable automatic matching</span>
-            </label>
-          </div>
-        </div>
+            {/* Helper text */}
+            <p className="text-xs text-gray-500 pt-2 border-t border-gray-100">
+              Matching will run {currentTypeOption.label.toLowerCase()} starting from the scheduled date.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Disabled state message */}
+      {!config.enabled && (
+        <p className="text-sm text-gray-500 pt-4 border-t border-gray-100">
+          Enable automatic matching to configure the schedule.
+        </p>
       )}
     </motion.div>
   );

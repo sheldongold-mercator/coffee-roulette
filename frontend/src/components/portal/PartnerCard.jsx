@@ -57,7 +57,7 @@ const PartnerCard = ({ partner }) => {
 
         <div className="mt-6 flex gap-3">
           <a
-            href={`mailto:${partner.email}?subject=Coffee%20Roulette%20-%20Let's%20meet!`}
+            href={`mailto:${partner.email}?subject=${encodeURIComponent("Coffee Roulette - Let's meet!")}&body=${encodeURIComponent(`Hi ${partner.firstName},\n\nI was matched with you for this round of Coffee Roulette! Would you like to schedule a time for a coffee chat?\n\nLooking forward to meeting you!`)}`}
             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-amber-200 transition-all"
           >
             <EnvelopeIcon className="w-5 h-5" />

@@ -91,7 +91,8 @@ const rawHtml = `
     .cta-button {
       display: inline-block;
       background: #667eea;
-      color: white;
+      background-color: #667eea;
+      color: #ffffff !important;
       padding: 12px 30px;
       text-decoration: none;
       border-radius: 5px;
@@ -100,6 +101,7 @@ const rawHtml = `
     }
     .cta-button.secondary {
       background: #6b7280;
+      background-color: #6b7280;
     }
     .opt-out-section {
       background: #fef3c7;
@@ -163,7 +165,7 @@ const rawHtml = `
     </div>
 
     <p>
-      <a href="\${portalLink}" class="cta-button">Visit Coffee Roulette Portal</a>
+      <a href="\${portalLink}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">Visit Coffee Roulette Portal</a>
     </p>
 
     <div class="opt-out-section">
@@ -320,7 +322,8 @@ module.exports = ({ userName, userEmail, departmentName, optOutToken, matchingFr
     .cta-button {
       display: inline-block;
       background: #667eea;
-      color: white;
+      background-color: #667eea;
+      color: #ffffff !important;
       padding: 12px 30px;
       text-decoration: none;
       border-radius: 5px;
@@ -329,6 +332,7 @@ module.exports = ({ userName, userEmail, departmentName, optOutToken, matchingFr
     }
     .cta-button.secondary {
       background: #6b7280;
+      background-color: #6b7280;
     }
     .opt-out-section {
       background: #fef3c7;
@@ -392,7 +396,7 @@ module.exports = ({ userName, userEmail, departmentName, optOutToken, matchingFr
     </div>
 
     <p>
-      <a href="${portalLink}" class="cta-button">Visit Coffee Roulette Portal</a>
+      <a href="${portalLink}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">Visit Coffee Roulette Portal</a>
     </p>
 
     <div class="opt-out-section">

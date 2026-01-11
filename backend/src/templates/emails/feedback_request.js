@@ -17,7 +17,7 @@ const rawHtml = `
     .feedback-card h2 { margin-top: 0; color: #1976d2; }
     .why-feedback { background: #fff9e6; padding: 15px; border-radius: 5px; margin: 20px 0; }
     .why-feedback h3 { margin-top: 0; color: #f57c00; }
-    .cta-button { display: inline-block; background: #2196f3; color: white; padding: 15px 40px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; font-size: 16px; }
+    .cta-button { display: inline-block; background: #2196f3; background-color: #2196f3; color: #ffffff !important; padding: 15px 40px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; font-size: 16px; }
     .footer { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 10px 10px; border: 1px solid #e0e0e0; border-top: none; color: #666; font-size: 14px; }
     .stars { font-size: 24px; margin: 10px 0; }
   </style>
@@ -52,7 +52,7 @@ const rawHtml = `
         <li>Demonstrate program value to leadership</li>
       </ul>
     </div>
-    <p style="text-align: center; margin-top: 30px;"><a href="\${feedbackUrl}" class="cta-button">Share Your Feedback</a></p>
+    <p style="text-align: center; margin-top: 30px;"><a href="\${feedbackUrl}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">Share Your Feedback</a></p>
     <p style="margin-top: 30px; color: #666; font-size: 14px;"><em>Didn't meet yet? No problem! You can submit feedback whenever you're ready.</em></p>
   </div>
   <div class="footer">
@@ -152,7 +152,8 @@ module.exports = ({ userName, partnerName, pairingId }) => {
     .cta-button {
       display: inline-block;
       background: #2196f3;
-      color: white;
+      background-color: #2196f3;
+      color: #ffffff !important;
       padding: 15px 40px;
       text-decoration: none;
       border-radius: 5px;
@@ -212,7 +213,7 @@ module.exports = ({ userName, partnerName, pairingId }) => {
     </div>
 
     <p style="text-align: center; margin-top: 30px;">
-      <a href="${feedbackUrl}" class="cta-button">
+      <a href="${feedbackUrl}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">
         Share Your Feedback
       </a>
     </p>

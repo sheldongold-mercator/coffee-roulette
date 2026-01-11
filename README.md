@@ -88,6 +88,8 @@ coffee-roulette/
 ├── .github/workflows/          # CI/CD pipelines
 ├── docker-compose.yml          # Local development
 ├── .env.example                # Environment template
+├── BACKLOG.md                  # Feature backlog and bug tracking
+├── CLAUDE.md                   # Claude Code context and conventions
 └── README.md
 ```
 
@@ -408,6 +410,26 @@ Configured via node-cron:
 - `pairingNotification.js` - Notification when matched with a coffee partner
 - `meetingReminder.js` - Reminders before scheduled meetings
 - `feedbackRequest.js` - Request for feedback after meetings
+
+### User Portal
+
+Employees access the portal to view their coffee matches and manage participation:
+
+**Portal Features:**
+- **Current Match View**: See your coffee partner with their details (name, department, role, email)
+- **Contact Options**: Quick buttons to send email or start Teams chat with partner
+- **Meeting Confirmation**: "We Had Our Coffee!" button to confirm meeting completion
+- **Feedback System**: Rate your experience (1-5 stars), share topics discussed, leave comments
+- **Pairing History**: View all past coffee matches and feedback
+- **Profile Management**: Update preferences and opt-in/opt-out status
+
+**Portal Flow:**
+1. User receives matching notification email with portal link
+2. Views their assigned coffee partner
+3. Reaches out to schedule meeting
+4. After meeting, clicks "We Had Our Coffee!" to confirm
+5. Feedback form automatically opens for rating and comments
+6. Can update feedback later via "Change Feedback" button
 
 ### Template Management (Admin)
 

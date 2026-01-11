@@ -127,6 +127,7 @@ const UserDetailModal = ({ userId, onClose }) => {
         queryClient.invalidateQueries(['user', userId]);
         queryClient.invalidateQueries(['users']);
         setHasChanges(false);
+        onClose();
       },
       onError: (error) => {
         toast.error(error.response?.data?.message || 'Failed to update user');
@@ -356,15 +357,6 @@ const UserDetailModal = ({ userId, onClose }) => {
                   />
                   <span className="text-sm font-medium text-gray-700">Active Account</span>
                 </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isOptedIn ?? true}
-                    onChange={(e) => handleInputChange('isOptedIn', e.target.checked)}
-                    className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Opted In to Matching</span>
-                </label>
               </div>
 
               {/* Timestamps */}
@@ -402,6 +394,19 @@ const UserDetailModal = ({ userId, onClose }) => {
               {/* Matching Overrides */}
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-gray-700">Admin Overrides</h4>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isOptedIn ?? true}
+                    onChange={(e) => handleInputChange('isOptedIn', e.target.checked)}
+                    className="mt-0.5 w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Opted into Matching</span>
+                    <p className="text-xs text-gray-500">User will be included in matching rounds when enabled</p>
+                  </div>
+                </label>
 
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input

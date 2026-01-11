@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import {
-  PlayIcon,
   EyeIcon,
   ClockIcon,
   CheckCircleIcon,
@@ -11,7 +10,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { matchingAPI } from '../services/api';
 import { format } from 'date-fns';
-import toast from 'react-hot-toast';
 import MatchingRoundModal from '../components/matching/MatchingRoundModal';
 import ScheduleConfig from '../components/matching/ScheduleConfig';
 import ManualMatchingModal from '../components/matching/ManualMatchingModal';
@@ -35,27 +33,6 @@ const Matching = () => {
     () => matchingAPI.previewMatching(),
     { enabled: showPreview }
   );
-
-  const runMatchingMutation = useMutation(
-    (data) => matchingAPI.runMatching(data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('matching-rounds');
-        queryClient.invalidateQueries('analytics-overview');
-        toast.success('Matching round completed successfully!');
-        setShowPreview(false);
-      },
-      onError: () => {
-        toast.error('Failed to run matching round');
-      },
-    }
-  );
-
-  const handleQuickMatch = () => {
-    if (window.confirm('Are you sure you want to run a quick matching round with all eligible users?')) {
-      runMatchingMutation.mutate({});
-    }
-  };
 
   // Handle axios response wrapper: response.data.data
   const rounds = Array.isArray(roundsData?.data?.data)
@@ -90,23 +67,6 @@ const Matching = () => {
           >
             <EyeIcon className="w-5 h-5" />
             {showPreview ? 'Hide Preview' : 'Preview'}
-          </button>
-          <button
-            onClick={handleQuickMatch}
-            disabled={runMatchingMutation.isLoading}
-            className="btn btn-secondary"
-          >
-            {runMatchingMutation.isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                <span>Running...</span>
-              </>
-            ) : (
-              <>
-                <PlayIcon className="w-5 h-5" />
-                <span>Quick Match</span>
-              </>
-            )}
           </button>
           <button
             onClick={() => setShowManualModal(true)}
@@ -331,16 +291,15 @@ const Matching = () => {
       )}
 
       {/* Manual Matching Modal */}
-      {showManualModal && (
-        <ManualMatchingModal
-          onClose={() => setShowManualModal(false)}
-          onSuccess={() => {
-            queryClient.invalidateQueries('matching-rounds');
-            queryClient.invalidateQueries('matching-schedule');
-            queryClient.invalidateQueries('analytics-overview');
-          }}
-        />
-      )}
+      <ManualMatchingModal
+        isOpen={showManualModal}
+        onClose={() => setShowManualModal(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries('matching-rounds');
+          queryClient.invalidateQueries('matching-schedule');
+          queryClient.invalidateQueries('analytics-overview');
+        }}
+      />
     </div>
   );
 };

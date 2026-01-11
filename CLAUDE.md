@@ -35,7 +35,7 @@ coffee-roulette/
 ├── backend/
 │   └── src/
 │       ├── config/         # Database, passport, Graph API config
-│       ├── controllers/    # Request handlers (adminXxxController.js pattern)
+│       ├── controllers/    # Request handlers (adminXxxController.js, userController.js)
 │       ├── jobs/           # Cron job definitions
 │       ├── middleware/     # Auth, validation, error handling
 │       ├── models/         # Sequelize models (PascalCase.js)
@@ -45,13 +45,22 @@ coffee-roulette/
 │       └── utils/          # Helpers, logger
 ├── frontend/
 │   └── src/
-│       ├── components/     # Reusable UI components
+│       ├── components/
+│       │   ├── matching/   # ScheduleConfig, ManualMatchingModal, etc.
+│       │   ├── portal/     # PartnerCard, FeedbackForm, IcebreakerList, EmptyState
+│       │   ├── templates/  # TemplateEditor
+│       │   └── users/      # UserDetailModal
 │       ├── config/         # MSAL configuration
 │       ├── contexts/       # React Context providers
 │       ├── hooks/          # Custom React hooks
-│       ├── pages/          # Route page components
-│       └── services/       # API client (api.js)
-└── kubernetes/             # K8s deployment manifests
+│       ├── pages/
+│       │   ├── portal/     # User portal pages (PortalHome, Profile, PairingHistory)
+│       │   └── *.jsx       # Admin pages (Dashboard, Users, Matching, etc.)
+│       └── services/
+│           ├── api.js      # Admin API client
+│           └── portalAPI.js # User portal API client
+├── kubernetes/             # K8s deployment manifests
+└── BACKLOG.md              # Feature backlog and bug tracking
 ```
 
 ## Key Commands
@@ -87,9 +96,14 @@ npm test             # Run tests
 
 ### Frontend
 - **Components:** PascalCase filenames, functional components with hooks
-- **Pages:** One component per route in `/pages`
-- **API Calls:** Use `api.js` service with React Query for data fetching
-- **Styling:** Tailwind utility classes, custom `.btn`, `.card`, `.input` classes
+- **Pages:** One component per route in `/pages`, portal pages in `/pages/portal`
+- **API Calls:** Use `api.js` for admin, `portalAPI.js` for user portal, with React Query
+- **Styling:** Tailwind utility classes, custom classes in `index.css`:
+  - `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-sm` - Buttons
+  - `.card` - Card containers
+  - `.input` - Form inputs
+  - `.badge-*` - Status badges (success, warning, error, info)
+  - `.toggle-switch` - iOS-style toggle switches
 - **Icons:** Heroicons (`@heroicons/react/24/outline`)
 - **Animations:** Framer Motion for page transitions and micro-interactions
 
@@ -136,11 +150,13 @@ Frontend requires in `.env`:
 ## Current Features
 
 1. **Admin Dashboard** - Analytics, user management, department controls
-2. **Matching Algorithm** - Smart pairing with cross-department bonuses, repeat penalties
-3. **Department Phased Rollout** - Enable departments gradually with auto opt-in
-4. **Tokenised Opt-Out** - One-click opt-out links without authentication
-5. **Template Management** - Monaco editor for customising email/Teams templates
-6. **Microsoft Integration** - User sync, calendar events, Teams notifications
+2. **User Portal** - Employee-facing portal for viewing matches, confirming meetings, leaving feedback
+3. **Matching Algorithm** - Smart pairing with cross-department bonuses, repeat penalties
+4. **Configurable Schedule** - Weekly/biweekly/monthly matching with inline date/time editing
+5. **Department Phased Rollout** - Enable departments gradually with auto opt-in
+6. **Tokenised Opt-Out** - One-click opt-out links without authentication
+7. **Template Management** - Monaco editor for customising email/Teams templates
+8. **Microsoft Integration** - User sync, calendar events, Teams notifications
 
 ## Testing
 
@@ -156,3 +172,24 @@ Frontend requires in `.env`:
 - **Frontend dev port:** 3001
 - **Grace period:** New opt-ins wait 48 hours before being eligible for matching
 - **Template fallback:** Custom templates in DB, falls back to file templates when `is_active=false`
+
+## Database Operations
+
+### Full Reset (Fresh Start)
+To reset the database while keeping configuration:
+```sql
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE meeting_feedback;
+TRUNCATE TABLE pairing_icebreakers;
+TRUNCATE TABLE pairings;
+TRUNCATE TABLE matching_rounds;
+TRUNCATE TABLE notification_queue;
+TRUNCATE TABLE audit_logs;
+TRUNCATE TABLE users;
+SET FOREIGN_KEY_CHECKS = 1;
+UPDATE departments SET is_active = 0;
+```
+This preserves: `admin_users`, `system_settings`, `notification_templates`, `icebreaker_topics`
+
+### Backlog
+See `BACKLOG.md` for feature requests and bugs to be addressed.

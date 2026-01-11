@@ -41,6 +41,7 @@ const PairingHistory = () => {
   );
 
   const pairings = data?.data?.pairings || [];
+  const totalRounds = data?.data?.totalRounds || 0;
 
   // Loading skeleton
   if (isLoading) {
@@ -115,7 +116,7 @@ const PairingHistory = () => {
           </div>
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border border-purple-100">
             <div className="text-3xl font-bold text-purple-600">
-              {new Set(pairings.map((p) => p.round?.name).filter(Boolean)).size}
+              {totalRounds}
             </div>
             <div className="text-sm text-gray-600">Rounds</div>
           </div>

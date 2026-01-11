@@ -53,7 +53,7 @@ const rawHtml = `
       <li><strong>Meet up:</strong> Grab a coffee and enjoy the conversation</li>
       <li><strong>Share feedback:</strong> Let us know how it went</li>
     </ol>
-    <p style="margin-top: 30px;"><a href="\${pairingUrl}" class="cta-button">View My Pairing</a></p>
+    <p style="margin-top: 30px;"><a href="\${pairingUrl}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">View My Pairing</a></p>
   </div>
   <div class="footer">
     <p>This is an automated message from Coffee Roulette.</p>
@@ -176,7 +176,8 @@ module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meet
     .cta-button {
       display: inline-block;
       background: #667eea;
-      color: white;
+      background-color: #667eea;
+      color: #ffffff !important;
       padding: 12px 30px;
       text-decoration: none;
       border-radius: 5px;
@@ -239,7 +240,7 @@ module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meet
     </ol>
 
     <p style="margin-top: 30px;">
-      <a href="${pairingUrl}" class="cta-button">
+      <a href="${pairingUrl}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">
         View My Pairing
       </a>
     </p>

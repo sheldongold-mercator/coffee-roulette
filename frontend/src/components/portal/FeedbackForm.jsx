@@ -6,12 +6,13 @@ import { XMarkIcon, StarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { portalAPI } from '../../services/portalAPI';
 
-const FeedbackForm = ({ pairingId, partnerName, onClose, onSuccess }) => {
+const FeedbackForm = ({ pairingId, partnerName, existingFeedback, onClose, onSuccess }) => {
   const queryClient = useQueryClient();
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState(existingFeedback?.rating || 0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [comments, setComments] = useState('');
-  const [topicsDiscussed, setTopicsDiscussed] = useState('');
+  const [comments, setComments] = useState(existingFeedback?.comments || '');
+  const [topicsDiscussed, setTopicsDiscussed] = useState(existingFeedback?.topicsDiscussed || '');
+  const isEditing = !!existingFeedback;
 
   const submitMutation = useMutation(
     (data) => portalAPI.submitFeedback(pairingId, data),
@@ -60,9 +61,11 @@ const FeedbackForm = ({ pairingId, partnerName, onClose, onSuccess }) => {
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">How was it?</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                {isEditing ? 'Update Feedback' : 'How was it?'}
+              </h2>
               <p className="text-sm text-gray-500">
-                Share your experience with {partnerName}
+                {isEditing ? 'Update your experience with' : 'Share your experience with'} {partnerName}
               </p>
             </div>
             <button
@@ -144,10 +147,10 @@ const FeedbackForm = ({ pairingId, partnerName, onClose, onSuccess }) => {
               {submitMutation.isLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Submitting...
+                  {isEditing ? 'Updating...' : 'Submitting...'}
                 </span>
               ) : (
-                'Submit Feedback'
+                isEditing ? 'Update Feedback' : 'Submit Feedback'
               )}
             </button>
           </form>
