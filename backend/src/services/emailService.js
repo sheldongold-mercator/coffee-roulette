@@ -3,6 +3,7 @@ const { NotificationTemplate } = require('../models');
 const { interpolate, prepareVariables } = require('../utils/templateInterpolation');
 const microsoftGraphService = require('./microsoftGraphService');
 const { getFrontendUrl, buildBackendUrl } = require('../config/urls');
+const scheduleService = require('./scheduleService');
 
 class EmailService {
   constructor() {
@@ -86,6 +87,14 @@ class EmailService {
    * Send pairing notification email
    */
   async sendPairingNotification(pairing, user, partner, icebreakers) {
+    // Get schedule config for matching frequency info
+    let scheduleConfig = {};
+    try {
+      scheduleConfig = await scheduleService.getScheduleConfig();
+    } catch (error) {
+      logger.warn('Failed to get schedule config for email notification:', error.message);
+    }
+
     const variables = {
       userName: user.first_name,
       partnerName: `${partner.first_name} ${partner.last_name}`,
@@ -93,7 +102,9 @@ class EmailService {
       partnerDepartment: partner.department?.name || 'Unknown',
       meetingDate: pairing.meeting_scheduled_at,
       icebreakers: icebreakers.map(ib => ib.topic),
-      pairingId: pairing.id
+      pairingId: pairing.id,
+      matchingFrequency: scheduleConfig.scheduleType || 'monthly',
+      nextMatchingDate: scheduleConfig.nextRunDate || null
     };
 
     const { subject, html, text } = await this.getTemplate('pairing_notification', variables);
@@ -153,13 +164,23 @@ class EmailService {
    * Send welcome email to new Coffee Roulette participant
    */
   async sendWelcomeEmail(user, departmentName = null) {
+    // Get schedule config for matching frequency info
+    let scheduleConfig = {};
+    try {
+      scheduleConfig = await scheduleService.getScheduleConfig();
+    } catch (error) {
+      logger.warn('Failed to get schedule config for welcome email:', error.message);
+    }
+
     const variables = {
       userName: user.first_name,
       userEmail: user.email,
       departmentName,
       optOutToken: user.opt_out_token,
       portalLink: getFrontendUrl(),
-      optOutLink: buildBackendUrl(`/api/public/opt-out/${user.opt_out_token}`)
+      optOutLink: buildBackendUrl(`/api/public/opt-out/${user.opt_out_token}`),
+      matchingFrequency: scheduleConfig.scheduleType || 'monthly',
+      nextMatchingDate: scheduleConfig.nextRunDate || null
     };
 
     const { subject, html, text } = await this.getTemplate('welcome', variables);
@@ -179,6 +200,14 @@ class EmailService {
   async sendBulkWelcomeEmails(users, departmentName = null) {
     const results = [];
 
+    // Get schedule config once for all emails
+    let scheduleConfig = {};
+    try {
+      scheduleConfig = await scheduleService.getScheduleConfig();
+    } catch (error) {
+      logger.warn('Failed to get schedule config for bulk welcome emails:', error.message);
+    }
+
     for (const user of users) {
       try {
         const variables = {
@@ -187,7 +216,9 @@ class EmailService {
           departmentName,
           optOutToken: user.opt_out_token,
           portalLink: getFrontendUrl(),
-          optOutLink: buildBackendUrl(`/api/public/opt-out/${user.opt_out_token}`)
+          optOutLink: buildBackendUrl(`/api/public/opt-out/${user.opt_out_token}`),
+          matchingFrequency: scheduleConfig.scheduleType || 'monthly',
+          nextMatchingDate: scheduleConfig.nextRunDate || null
         };
 
         const { subject, html, text } = await this.getTemplate('welcome', variables);

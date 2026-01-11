@@ -23,19 +23,44 @@ class MatchingService {
   /**
    * Get eligible participants for matching
    * Checks: active, opted_in, grace period, available_from, department status
+   * Supports optional filters for manual matching
+   *
+   * @param {Object} filters - Optional filters for manual matching
+   * @param {number[]} filters.departmentIds - Only include users from these departments
+   * @param {number[]} filters.userIds - Only include these specific users
+   * @param {string[]} filters.seniorityLevels - Only include users with these seniority levels
+   * @param {boolean} filters.ignoreGracePeriod - Skip grace period check
    */
-  async getEligibleParticipants() {
+  async getEligibleParticipants(filters = null) {
     // Get grace period setting (in hours), default to 48 hours
     const gracePeriodHours = await this.getSetting('matching.grace_period_hours', 48);
     const gracePeriodCutoff = new Date(Date.now() - gracePeriodHours * 60 * 60 * 1000);
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
 
-    // First, get all opted-in active users
+    // Build base WHERE clause
+    const whereClause = {
+      is_active: true,
+      is_opted_in: true
+    };
+
+    // Apply user ID filter if specified
+    if (filters?.userIds && filters.userIds.length > 0) {
+      whereClause.id = { [Op.in]: filters.userIds };
+    }
+
+    // Apply department filter if specified
+    if (filters?.departmentIds && filters.departmentIds.length > 0) {
+      whereClause.department_id = { [Op.in]: filters.departmentIds };
+    }
+
+    // Apply seniority level filter if specified
+    if (filters?.seniorityLevels && filters.seniorityLevels.length > 0) {
+      whereClause.seniority_level = { [Op.in]: filters.seniorityLevels };
+    }
+
+    // First, get all opted-in active users (with filters applied)
     const users = await User.findAll({
-      where: {
-        is_active: true,
-        is_opted_in: true
-      },
+      where: whereClause,
       include: [
         {
           association: 'department',
@@ -44,7 +69,10 @@ class MatchingService {
       ]
     });
 
-    // Filter eligible participants based on all criteria
+    // Check if we should ignore grace period for this match
+    const ignoreGracePeriod = filters?.ignoreGracePeriod === true;
+
+    // Filter eligible participants based on remaining criteria
     const eligible = users.filter(user => {
       // Check available_from date (must be null or <= today)
       if (user.available_from && user.available_from > today) {
@@ -52,20 +80,24 @@ class MatchingService {
       }
 
       // Check department status (with override support)
-      const deptActive = user.department && user.department.is_active;
-      if (!deptActive && !user.override_department_exclusion) {
-        return false;
+      // Skip this check if department filter is explicitly specified
+      if (!filters?.departmentIds || filters.departmentIds.length === 0) {
+        const deptActive = user.department && user.department.is_active;
+        if (!deptActive && !user.override_department_exclusion) {
+          return false;
+        }
       }
 
       // Check grace period (with skip_grace_period override)
-      if (!user.skip_grace_period && user.opted_in_at && new Date(user.opted_in_at) > gracePeriodCutoff) {
+      if (!ignoreGracePeriod && !user.skip_grace_period && user.opted_in_at && new Date(user.opted_in_at) > gracePeriodCutoff) {
         return false;
       }
 
       return true;
     });
 
-    logger.info(`Found ${eligible.length} eligible participants for matching (grace period: ${gracePeriodHours}h)`);
+    const filterDesc = filters ? ` (filters: ${JSON.stringify(filters)})` : '';
+    logger.info(`Found ${eligible.length} eligible participants for matching${filterDesc}`);
     return eligible;
   }
 
@@ -170,8 +202,15 @@ class MatchingService {
 
   /**
    * Run matching algorithm to create pairings
+   *
+   * @param {number} roundId - The matching round ID
+   * @param {boolean} previewOnly - If true, don't save to database
+   * @param {Object} transaction - Sequelize transaction
+   * @param {Object} options - Additional options
+   * @param {Object} options.filters - Participant filters
+   * @param {boolean} options.ignoreRecentHistory - Skip lookback penalties
    */
-  async runMatchingAlgorithm(roundId, previewOnly = false, transaction = null) {
+  async runMatchingAlgorithm(roundId, previewOnly = false, transaction = null, options = {}) {
     try {
       logger.info(`${previewOnly ? 'Previewing' : 'Running'} matching algorithm for round ${roundId}`);
 
@@ -188,15 +227,21 @@ class MatchingService {
         repeatPenalty
       };
 
-      // 1. Get eligible participants
-      const participants = await this.getEligibleParticipants();
+      // 1. Get eligible participants (with optional filters)
+      const participants = await this.getEligibleParticipants(options.filters || null);
 
       if (participants.length < 2) {
         throw new Error('Not enough eligible participants for matching (minimum 2 required)');
       }
 
-      // 2. Get recent pairings for constraint checking
-      const recentPairings = await this.getRecentPairings(lookbackRounds);
+      // 2. Get recent pairings for constraint checking (or skip if ignoreRecentHistory)
+      const recentPairings = options.ignoreRecentHistory
+        ? []
+        : await this.getRecentPairings(lookbackRounds);
+
+      if (options.ignoreRecentHistory) {
+        logger.info('Ignoring recent pairing history for this round');
+      }
 
       // 3. Shuffle participants for randomness
       const shuffled = shuffleArray(participants);
@@ -511,8 +556,17 @@ class MatchingService {
 
   /**
    * Create and execute a new matching round
+   *
+   * @param {Date} scheduledDate - The scheduled date for the round
+   * @param {string} name - Optional name for the round
+   * @param {Object} options - Additional options
+   * @param {string} options.source - 'scheduled' or 'manual'
+   * @param {Object} options.filters - Participant filters for manual matching
+   * @param {boolean} options.ignoreRecentHistory - Skip lookback penalties
+   * @param {number} options.triggeredByUserId - Admin user who triggered manual round
+   * @param {boolean} options.resetAutoSchedule - Whether to reset auto-schedule timer
    */
-  async createAndExecuteRound(scheduledDate, name = null) {
+  async createAndExecuteRound(scheduledDate, name = null, options = {}) {
     const transaction = await MatchingRound.sequelize.transaction();
 
     try {
@@ -524,17 +578,28 @@ class MatchingService {
         name = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
       }
 
-      // Create matching round
+      // Determine source (default to scheduled)
+      const source = options.source || 'scheduled';
+      const isManual = source === 'manual';
+
+      // Create matching round with audit fields
       const round = await MatchingRound.create({
         name,
         scheduled_date: scheduledDate,
-        status: 'in_progress'
+        status: 'in_progress',
+        source: source,
+        filters_applied: isManual && options.filters ? options.filters : null,
+        ignored_recent_history: options.ignoreRecentHistory || false,
+        triggered_by_user_id: options.triggeredByUserId || null
       }, { transaction });
 
-      logger.info(`Created matching round ${round.id}: ${name}`);
+      logger.info(`Created matching round ${round.id}: ${name} (source: ${source})`);
 
-      // Run matching algorithm
-      const result = await this.runMatchingAlgorithm(round.id, false, transaction);
+      // Run matching algorithm with options
+      const result = await this.runMatchingAlgorithm(round.id, false, transaction, {
+        filters: options.filters,
+        ignoreRecentHistory: options.ignoreRecentHistory
+      });
 
       // Update round with results
       await round.update({
@@ -564,6 +629,17 @@ class MatchingService {
         }
       }
 
+      // Handle resetAutoSchedule option for manual matches
+      if (isManual && options.resetAutoSchedule) {
+        try {
+          const scheduleService = require('./scheduleService');
+          await scheduleService.recordScheduledRun();
+          logger.info('Auto-schedule timer reset after manual matching');
+        } catch (err) {
+          logger.error('Error resetting auto-schedule timer (non-fatal):', err);
+        }
+      }
+
       return {
         round: {
           id: round.id,
@@ -571,6 +647,9 @@ class MatchingService {
           scheduledDate: round.scheduled_date,
           executedAt: round.executed_at,
           status: round.status,
+          source: round.source,
+          filtersApplied: round.filters_applied,
+          ignoredRecentHistory: round.ignored_recent_history,
           totalParticipants: round.total_participants,
           totalPairings: round.total_pairings
         },
@@ -580,6 +659,30 @@ class MatchingService {
     } catch (error) {
       await transaction.rollback();
       logger.error('Error creating and executing matching round:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Preview matching with filters (doesn't save to database)
+   */
+  async previewMatchingWithFilters(filters = null, options = {}) {
+    try {
+      // Create a temporary round ID for preview
+      const tempRoundId = 0;
+
+      const result = await this.runMatchingAlgorithm(tempRoundId, true, null, {
+        filters,
+        ignoreRecentHistory: options.ignoreRecentHistory
+      });
+
+      return {
+        ...result,
+        filters: filters,
+        ignoreRecentHistory: options.ignoreRecentHistory || false
+      };
+    } catch (error) {
+      logger.error('Error previewing matching with filters:', error);
       throw error;
     }
   }

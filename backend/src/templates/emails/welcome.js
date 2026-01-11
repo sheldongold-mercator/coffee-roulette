@@ -3,6 +3,8 @@
  * Sent when a department is activated or a new user joins an active department
  */
 
+const { formatDate } = require('../../utils/helpers');
+
 // Raw template subject with variable placeholders (for editor display)
 const rawSubject = '☕ Welcome to Coffee Roulette!';
 
@@ -152,7 +154,7 @@ const rawHtml = `
     <div class="how-it-works">
       <h3>📋 How It Works</h3>
       <ol>
-        <li><strong>Monthly matching:</strong> On the 1st of each month, you'll be paired with a random colleague</li>
+        <li><strong>\${matchingFrequency} matching:</strong> Your next matching is scheduled for \${nextMatchingDate}</li>
         <li><strong>You'll receive an email:</strong> We'll introduce you and your coffee partner</li>
         <li><strong>Schedule your chat:</strong> Reach out to your partner and find a time that works</li>
         <li><strong>Have a coffee:</strong> In-person, virtual, or however works best for you</li>
@@ -198,7 +200,7 @@ WHY COFFEE ROULETTE?
 - It's just 30 minutes: A small time investment with lasting benefits
 
 HOW IT WORKS
-1. Monthly matching: On the 1st of each month, you'll be paired with a random colleague
+1. \${matchingFrequency} matching: Your next matching is scheduled for \${nextMatchingDate}
 2. You'll receive an email: We'll introduce you and your coffee partner
 3. Schedule your chat: Reach out to your partner and find a time that works
 4. Have a coffee: In-person, virtual, or however works best for you
@@ -221,10 +223,18 @@ You can manage your preferences at any time in the Coffee Roulette portal.
 `;
 
 // Template function for rendering emails
-module.exports = ({ userName, userEmail, departmentName, optOutToken }) => {
+module.exports = ({ userName, userEmail, departmentName, optOutToken, matchingFrequency, nextMatchingDate }) => {
   const baseUrl = process.env.FRONTEND_URL || 'https://ec2-100-52-223-104.compute-1.amazonaws.com';
   const optOutLink = `${baseUrl}/api/public/opt-out/${optOutToken}`;
   const portalLink = baseUrl;
+
+  // Format matching frequency for display (capitalize first letter)
+  const frequencyLabel = matchingFrequency
+    ? matchingFrequency.charAt(0).toUpperCase() + matchingFrequency.slice(1).replace('-', ' ')
+    : 'Monthly';
+
+  // Format next matching date
+  const formattedNextDate = nextMatchingDate ? formatDate(nextMatchingDate) : 'the 1st of next month';
 
   const subject = rawSubject;
 
@@ -373,7 +383,7 @@ module.exports = ({ userName, userEmail, departmentName, optOutToken }) => {
     <div class="how-it-works">
       <h3>📋 How It Works</h3>
       <ol>
-        <li><strong>Monthly matching:</strong> On the 1st of each month, you'll be paired with a random colleague</li>
+        <li><strong>${frequencyLabel} matching:</strong> Your next matching is scheduled for ${formattedNextDate}</li>
         <li><strong>You'll receive an email:</strong> We'll introduce you and your coffee partner</li>
         <li><strong>Schedule your chat:</strong> Reach out to your partner and find a time that works</li>
         <li><strong>Have a coffee:</strong> In-person, virtual, or however works best for you</li>
@@ -419,7 +429,7 @@ WHY COFFEE ROULETTE?
 - It's just 30 minutes: A small time investment with lasting benefits
 
 HOW IT WORKS
-1. Monthly matching: On the 1st of each month, you'll be paired with a random colleague
+1. ${frequencyLabel} matching: Your next matching is scheduled for ${formattedNextDate}
 2. You'll receive an email: We'll introduce you and your coffee partner
 3. Schedule your chat: Reach out to your partner and find a time that works
 4. Have a coffee: In-person, virtual, or however works best for you

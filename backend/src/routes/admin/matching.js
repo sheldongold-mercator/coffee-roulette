@@ -9,7 +9,12 @@ const {
   runMatching,
   getMatchingSettings,
   updateMatchingSettings,
-  getEligibleParticipantsCount
+  getEligibleParticipantsCount,
+  getScheduleConfig,
+  updateSchedule,
+  toggleAutoSchedule,
+  runManualMatching,
+  previewMatchingWithFilters
 } = require('../../controllers/adminMatchingController');
 
 // Apply authentication and admin authorization to all routes
@@ -30,5 +35,14 @@ router.put('/settings', updateMatchingSettings);
 
 // Eligible participants
 router.get('/eligible', getEligibleParticipantsCount);
+
+// Schedule management
+router.get('/schedule', getScheduleConfig);
+router.put('/schedule', updateSchedule);
+router.post('/schedule/toggle', toggleAutoSchedule);
+
+// Manual matching with filters
+router.post('/run-manual', runManualMatching);
+router.post('/preview-filtered', previewMatchingWithFilters);
 
 module.exports = router;

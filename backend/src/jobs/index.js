@@ -1,44 +1,73 @@
+const cron = require('node-cron');
 const logger = require('../utils/logger');
 
-// Import all job modules
-const monthlyMatchingJob = require('./monthlyMatching');
+// Import job execution functions (not the cron instances)
+const { executeMonthlyMatching } = require('./monthlyMatching');
 const notificationProcessingJob = require('./processNotifications');
 const dailyUserSyncJob = require('./dailyUserSync');
 
 /**
  * Job orchestrator
- * Manages all scheduled jobs
+ * Manages all scheduled jobs with dynamic schedule support
  */
 class JobOrchestrator {
   constructor() {
-    this.jobs = {
+    // Job configurations - monthlyMatching uses dynamic scheduling
+    this.jobConfigs = {
       monthlyMatching: {
-        job: monthlyMatchingJob,
         name: 'Monthly Matching',
-        schedule: '0 9 1 * *',
-        description: 'Creates monthly coffee pairing matches on the 1st of each month at 9:00 AM'
+        defaultSchedule: '0 9 1 * *',
+        description: 'Creates coffee pairing matches on configured schedule',
+        isDynamic: true, // Schedule can be updated at runtime
+        timezone: 'America/New_York'
       },
       notificationProcessing: {
-        job: notificationProcessingJob,
         name: 'Notification Processing',
-        schedule: '*/5 * * * *',
-        description: 'Processes pending notifications every 5 minutes'
+        defaultSchedule: '*/5 * * * *',
+        description: 'Processes pending notifications every 5 minutes',
+        isDynamic: false
       },
       dailyUserSync: {
-        job: dailyUserSyncJob,
         name: 'Daily User Sync',
-        schedule: '0 2 * * *',
-        description: 'Syncs users from Microsoft Graph every day at 2:00 AM'
+        defaultSchedule: '0 2 * * *',
+        description: 'Syncs users from Microsoft Graph every day at 2:00 AM',
+        isDynamic: false,
+        timezone: 'America/New_York'
       }
     };
+
+    // Active cron job instances
+    this.cronInstances = {};
+
+    // Legacy compatibility
+    this.jobs = {};
 
     this.isRunning = false;
   }
 
   /**
-   * Start all scheduled jobs
+   * Create a matching cron job with the specified schedule
    */
-  startAll() {
+  createMatchingCronJob(schedule, timezone, configName) {
+    return cron.schedule(schedule, async () => {
+      logger.info(`Executing job: ${configName}`);
+      try {
+        await executeMonthlyMatching();
+        const scheduleService = require('../services/scheduleService');
+        await scheduleService.recordScheduledRun();
+      } catch (error) {
+        logger.error(`Job ${configName} execution failed:`, error);
+      }
+    }, {
+      scheduled: false,
+      timezone: timezone
+    });
+  }
+
+  /**
+   * Initialize and start all scheduled jobs
+   */
+  async startAll() {
     if (this.isRunning) {
       logger.warn('Jobs are already running');
       return;
@@ -47,22 +76,188 @@ class JobOrchestrator {
     logger.info('Starting all scheduled jobs...');
 
     try {
-      Object.entries(this.jobs).forEach(([key, jobInfo]) => {
-        try {
-          jobInfo.job.start();
-          logger.info(`Started job: ${jobInfo.name}`, {
-            schedule: jobInfo.schedule,
-            description: jobInfo.description
-          });
-        } catch (error) {
-          logger.error(`Failed to start job ${jobInfo.name}:`, error);
-        }
-      });
+      // Start dynamic job (monthly matching) with schedule from settings
+      await this.initializeDynamicJob('monthlyMatching');
+
+      // Start static jobs
+      this.startStaticJob('notificationProcessing', notificationProcessingJob);
+      this.startStaticJob('dailyUserSync', dailyUserSyncJob);
 
       this.isRunning = true;
       logger.info('All scheduled jobs started successfully');
     } catch (error) {
       logger.error('Error starting jobs:', error);
+    }
+  }
+
+  /**
+   * Initialize a dynamic job with schedule from database
+   */
+  async initializeDynamicJob(jobKey) {
+    const config = this.jobConfigs[jobKey];
+    if (!config) {
+      throw new Error(`Job config not found: ${jobKey}`);
+    }
+
+    try {
+      // Get schedule from database settings
+      const scheduleService = require('../services/scheduleService');
+      const scheduleConfig = await scheduleService.getScheduleConfig();
+
+      const schedule = scheduleConfig.cronExpression || config.defaultSchedule;
+      const timezone = scheduleConfig.timezone || config.timezone || 'America/New_York';
+      const enabled = scheduleConfig.enabled !== false;
+
+      if (!enabled) {
+        logger.info(`Job ${config.name} is disabled, skipping...`);
+        this.jobs[jobKey] = {
+          name: config.name,
+          schedule: schedule,
+          description: config.description,
+          running: false,
+          enabled: false
+        };
+        return;
+      }
+
+      // Create and start cron job
+      const cronJob = this.createMatchingCronJob(schedule, timezone, config.name);
+      cronJob.start();
+      this.cronInstances[jobKey] = cronJob;
+      this.jobs[jobKey] = {
+        name: config.name,
+        schedule: schedule,
+        description: config.description,
+        running: true,
+        enabled: true,
+        isDynamic: true
+      };
+
+      logger.info(`Started dynamic job: ${config.name}`, {
+        schedule: schedule,
+        timezone: timezone
+      });
+    } catch (error) {
+      logger.error(`Failed to initialize dynamic job ${jobKey}:`, error);
+      // Fall back to default schedule
+      this.startStaticJobWithConfig(jobKey, config, executeMonthlyMatching);
+    }
+  }
+
+  /**
+   * Start a static (non-dynamic) job
+   */
+  startStaticJob(jobKey, jobInstance) {
+    const config = this.jobConfigs[jobKey];
+    if (!config) {
+      logger.error(`Job config not found: ${jobKey}`);
+      return;
+    }
+
+    try {
+      jobInstance.start();
+      this.cronInstances[jobKey] = jobInstance;
+      this.jobs[jobKey] = {
+        name: config.name,
+        schedule: config.defaultSchedule,
+        description: config.description,
+        running: true,
+        enabled: true,
+        isDynamic: false
+      };
+
+      logger.info(`Started job: ${config.name}`, {
+        schedule: config.defaultSchedule
+      });
+    } catch (error) {
+      logger.error(`Failed to start job ${config.name}:`, error);
+    }
+  }
+
+  /**
+   * Start a static job with config (fallback method)
+   */
+  startStaticJobWithConfig(jobKey, config, executeFunction) {
+    try {
+      const cronJob = cron.schedule(config.defaultSchedule, async () => {
+        logger.info(`Executing job: ${config.name}`);
+        try {
+          await executeFunction();
+        } catch (error) {
+          logger.error(`Job ${config.name} execution failed:`, error);
+        }
+      }, {
+        scheduled: false,
+        timezone: config.timezone || 'America/New_York'
+      });
+
+      cronJob.start();
+      this.cronInstances[jobKey] = cronJob;
+      this.jobs[jobKey] = {
+        name: config.name,
+        schedule: config.defaultSchedule,
+        description: config.description,
+        running: true,
+        enabled: true,
+        isDynamic: false
+      };
+
+      logger.info(`Started job (fallback): ${config.name}`);
+    } catch (error) {
+      logger.error(`Failed to start job ${config.name}:`, error);
+    }
+  }
+
+  /**
+   * Update job schedule dynamically
+   */
+  async updateJobSchedule(jobKey, newSchedule, timezone = null) {
+    const config = this.jobConfigs[jobKey];
+    if (!config) {
+      throw new Error(`Job config not found: ${jobKey}`);
+    }
+
+    if (!config.isDynamic) {
+      throw new Error(`Job ${jobKey} does not support dynamic scheduling`);
+    }
+
+    // Validate cron expression
+    if (!cron.validate(newSchedule)) {
+      throw new Error(`Invalid cron expression: ${newSchedule}`);
+    }
+
+    logger.info(`Updating schedule for ${config.name}: ${newSchedule}`);
+
+    try {
+      // Stop existing job if running
+      if (this.cronInstances[jobKey]) {
+        this.cronInstances[jobKey].stop();
+        logger.info(`Stopped existing job: ${config.name}`);
+      }
+
+      const effectiveTimezone = timezone || config.timezone || 'America/New_York';
+
+      // Create and start new job with updated schedule
+      const cronJob = this.createMatchingCronJob(newSchedule, effectiveTimezone, config.name);
+      cronJob.start();
+      this.cronInstances[jobKey] = cronJob;
+      this.jobs[jobKey] = {
+        ...this.jobs[jobKey],
+        schedule: newSchedule,
+        running: true
+      };
+
+      logger.info(`Successfully updated schedule for ${config.name} to ${newSchedule}`);
+
+      return {
+        success: true,
+        jobKey,
+        newSchedule,
+        timezone: effectiveTimezone
+      };
+    } catch (error) {
+      logger.error(`Failed to update schedule for ${jobKey}:`, error);
+      throw error;
     }
   }
 
@@ -78,12 +273,14 @@ class JobOrchestrator {
     logger.info('Stopping all scheduled jobs...');
 
     try {
-      Object.entries(this.jobs).forEach(([key, jobInfo]) => {
+      Object.entries(this.cronInstances).forEach(([key, cronInstance]) => {
         try {
-          jobInfo.job.stop();
-          logger.info(`Stopped job: ${jobInfo.name}`);
+          if (cronInstance && typeof cronInstance.stop === 'function') {
+            cronInstance.stop();
+            logger.info(`Stopped job: ${this.jobs[key]?.name || key}`);
+          }
         } catch (error) {
-          logger.error(`Failed to stop job ${jobInfo.name}:`, error);
+          logger.error(`Failed to stop job ${key}:`, error);
         }
       });
 
@@ -104,8 +301,10 @@ class JobOrchestrator {
         key,
         name: jobInfo.name,
         schedule: jobInfo.schedule,
-        description: jobInfo.description,
-        running: this.isRunning
+        description: jobInfo.description || this.jobConfigs[key]?.description,
+        running: jobInfo.running,
+        enabled: jobInfo.enabled,
+        isDynamic: jobInfo.isDynamic || false
       }))
     };
   }
@@ -114,24 +313,29 @@ class JobOrchestrator {
    * Manually trigger a specific job
    */
   async triggerJob(jobKey) {
-    const jobInfo = this.jobs[jobKey];
-
-    if (!jobInfo) {
+    const config = this.jobConfigs[jobKey];
+    if (!config) {
       throw new Error(`Job ${jobKey} not found`);
     }
 
-    logger.info(`Manually triggering job: ${jobInfo.name}`);
+    logger.info(`Manually triggering job: ${config.name}`);
 
     try {
-      // Note: We can't directly invoke cron jobs, so we would need to extract
-      // the job logic into separate functions. For now, just log.
-      logger.warn('Manual job triggering requires refactoring job functions');
+      if (jobKey === 'monthlyMatching') {
+        await executeMonthlyMatching();
+        return {
+          success: true,
+          message: `Job ${config.name} executed successfully`
+        };
+      }
+
+      // For other jobs, we cannot manually trigger them as they're imported instances
       return {
         success: false,
-        message: 'Manual triggering not yet implemented'
+        message: 'Manual triggering not supported for this job'
       };
     } catch (error) {
-      logger.error(`Error triggering job ${jobInfo.name}:`, error);
+      logger.error(`Error triggering job ${config.name}:`, error);
       throw error;
     }
   }

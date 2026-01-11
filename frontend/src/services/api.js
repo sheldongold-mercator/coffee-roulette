@@ -93,6 +93,13 @@ export const matchingAPI = {
   getSettings: () => api.get('/admin/matching/settings'),
   updateSettings: (settings) => api.put('/admin/matching/settings', { settings }),
   getEligibleCount: () => api.get('/admin/matching/eligible'),
+  // Schedule management
+  getSchedule: () => api.get('/admin/matching/schedule'),
+  updateSchedule: (data) => api.put('/admin/matching/schedule', data),
+  toggleAutoSchedule: (enabled) => api.post('/admin/matching/schedule/toggle', { enabled }),
+  // Manual matching with filters
+  runManualMatching: (data) => api.post('/admin/matching/run-manual', data),
+  previewWithFilters: (data) => api.post('/admin/matching/preview-filtered', data),
 };
 
 // Settings APIs

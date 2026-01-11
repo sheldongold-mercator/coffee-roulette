@@ -43,6 +43,32 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: true,
       comment: 'Error details if status is failed'
+    },
+    source: {
+      type: DataTypes.ENUM('scheduled', 'manual'),
+      defaultValue: 'scheduled',
+      allowNull: false,
+      comment: 'Whether round was triggered automatically or manually'
+    },
+    filters_applied: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'JSON object of filters applied for manual rounds'
+    },
+    ignored_recent_history: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      comment: 'Whether recent pairing history was ignored'
+    },
+    triggered_by_user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      },
+      comment: 'Admin user who triggered manual round'
     }
   }, {
     tableName: 'matching_rounds',
@@ -59,6 +85,10 @@ module.exports = (sequelize) => {
     MatchingRound.hasMany(models.Pairing, {
       foreignKey: 'matching_round_id',
       as: 'pairings'
+    });
+    MatchingRound.belongsTo(models.User, {
+      foreignKey: 'triggered_by_user_id',
+      as: 'triggeredByUser'
     });
   };
 

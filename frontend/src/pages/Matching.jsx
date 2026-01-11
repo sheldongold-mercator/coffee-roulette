@@ -7,16 +7,20 @@ import {
   ClockIcon,
   CheckCircleIcon,
   UsersIcon,
+  AdjustmentsHorizontalIcon,
 } from '@heroicons/react/24/outline';
 import { matchingAPI } from '../services/api';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import MatchingRoundModal from '../components/matching/MatchingRoundModal';
+import ScheduleConfig from '../components/matching/ScheduleConfig';
+import ManualMatchingModal from '../components/matching/ManualMatchingModal';
 
 const Matching = () => {
   const queryClient = useQueryClient();
   const [showPreview, setShowPreview] = useState(false);
   const [selectedRoundId, setSelectedRoundId] = useState(null);
+  const [showManualModal, setShowManualModal] = useState(false);
 
   const { data: roundsData, isLoading } = useQuery(['matching-rounds', 'v2'], () =>
     matchingAPI.getRounds({ limit: 10 })
@@ -47,8 +51,8 @@ const Matching = () => {
     }
   );
 
-  const handleRunMatching = () => {
-    if (window.confirm('Are you sure you want to run a new matching round?')) {
+  const handleQuickMatch = () => {
+    if (window.confirm('Are you sure you want to run a quick matching round with all eligible users?')) {
       runMatchingMutation.mutate({});
     }
   };
@@ -85,24 +89,31 @@ const Matching = () => {
             className="btn btn-secondary"
           >
             <EyeIcon className="w-5 h-5" />
-            {showPreview ? 'Hide Preview' : 'Preview Matching'}
+            {showPreview ? 'Hide Preview' : 'Preview'}
           </button>
           <button
-            onClick={handleRunMatching}
+            onClick={handleQuickMatch}
             disabled={runMatchingMutation.isLoading}
-            className="btn btn-primary"
+            className="btn btn-secondary"
           >
             {runMatchingMutation.isLoading ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
                 <span>Running...</span>
               </>
             ) : (
               <>
                 <PlayIcon className="w-5 h-5" />
-                <span>Run Matching</span>
+                <span>Quick Match</span>
               </>
             )}
+          </button>
+          <button
+            onClick={() => setShowManualModal(true)}
+            className="btn btn-primary"
+          >
+            <AdjustmentsHorizontalIcon className="w-5 h-5" />
+            <span>Manual Match</span>
           </button>
         </div>
       </motion.div>
@@ -164,6 +175,9 @@ const Matching = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Schedule Configuration */}
+      <ScheduleConfig />
 
       {/* Preview */}
       {showPreview && (
@@ -247,6 +261,7 @@ const Matching = () => {
               <tr>
                 <th>Round ID</th>
                 <th>Date</th>
+                <th>Source</th>
                 <th>Total Pairings</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -256,14 +271,14 @@ const Matching = () => {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <div className="h-10 bg-gray-200 animate-shimmer rounded"></div>
                     </td>
                   </tr>
                 ))
               ) : rounds.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-500">
+                  <td colSpan={6} className="text-center py-8 text-gray-500">
                     No matching rounds yet
                   </td>
                 </tr>
@@ -275,6 +290,17 @@ const Matching = () => {
                     </td>
                     <td className="text-gray-600">
                       {format(new Date(round.createdAt), 'MMM d, yyyy h:mm a')}
+                    </td>
+                    <td>
+                      <span className={`badge ${
+                        round.source === 'manual' ? 'badge-info' :
+                        round.source === 'scheduled' ? 'badge-secondary' :
+                        'badge-warning'
+                      }`}>
+                        {round.source === 'manual' ? 'Manual' :
+                         round.source === 'scheduled' ? 'Scheduled' :
+                         'Legacy'}
+                      </span>
                     </td>
                     <td className="text-gray-600">{round.totalPairings || 0}</td>
                     <td>
@@ -301,6 +327,18 @@ const Matching = () => {
         <MatchingRoundModal
           roundId={selectedRoundId}
           onClose={() => setSelectedRoundId(null)}
+        />
+      )}
+
+      {/* Manual Matching Modal */}
+      {showManualModal && (
+        <ManualMatchingModal
+          onClose={() => setShowManualModal(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries('matching-rounds');
+            queryClient.invalidateQueries('matching-schedule');
+            queryClient.invalidateQueries('analytics-overview');
+          }}
         />
       )}
     </div>

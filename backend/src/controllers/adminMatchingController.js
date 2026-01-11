@@ -1,5 +1,7 @@
 const { MatchingRound, Pairing, SystemSetting } = require('../models');
 const matchingService = require('../services/matchingService');
+const scheduleService = require('../services/scheduleService');
+const jobOrchestrator = require('../jobs');
 const { getStartOfNextMonth } = require('../utils/helpers');
 const logger = require('../utils/logger');
 
@@ -41,7 +43,8 @@ const getMatchingRounds = async (req, res) => {
         totalParticipants: round.total_participants,
         totalPairings: round.total_pairings,
         errorMessage: round.error_message,
-        createdAt: round.created_at
+        createdAt: round.created_at,
+        source: round.source || null
       })),
       pagination: {
         total: rounds.count,
@@ -108,28 +111,29 @@ const getMatchingRoundById = async (req, res) => {
         totalParticipants: round.total_participants,
         totalPairings: round.total_pairings,
         errorMessage: round.error_message,
-        createdAt: round.created_at
+        createdAt: round.created_at,
+        source: round.source || null
       },
-      pairings: round.pairings.map(pairing => ({
+      pairings: (round.pairings || []).map(pairing => ({
         id: pairing.id,
-        user1: {
+        user1: pairing.user1 ? {
           id: pairing.user1.id,
           firstName: pairing.user1.first_name,
           lastName: pairing.user1.last_name,
           email: pairing.user1.email,
           department: pairing.user1.department ? pairing.user1.department.name : null
-        },
-        user2: {
+        } : { firstName: 'Unknown', lastName: 'User', department: null },
+        user2: pairing.user2 ? {
           id: pairing.user2.id,
           firstName: pairing.user2.first_name,
           lastName: pairing.user2.last_name,
           email: pairing.user2.email,
           department: pairing.user2.department ? pairing.user2.department.name : null
-        },
+        } : { firstName: 'Unknown', lastName: 'User', department: null },
         status: pairing.status,
         meetingScheduledAt: pairing.meeting_scheduled_at,
         meetingCompletedAt: pairing.meeting_completed_at,
-        icebreakers: pairing.icebreakers.map(ib => ({
+        icebreakers: (pairing.icebreakers || []).map(ib => ({
           id: ib.id,
           topic: ib.topic,
           category: ib.category
@@ -150,37 +154,30 @@ const getMatchingRoundById = async (req, res) => {
  * Preview matching results (dry run)
  */
 const previewMatching = async (req, res) => {
+  let tempRound = null;
+
   try {
     logger.info(`Admin ${req.user.id} requested matching preview`);
 
     // Create temporary round for preview
-    const tempRound = await MatchingRound.create({
+    tempRound = await MatchingRound.create({
       name: 'Preview',
       scheduled_date: new Date(),
       status: 'scheduled'
     });
 
-    try {
-      // Run matching algorithm in preview mode
-      const result = await matchingService.runMatchingAlgorithm(tempRound.id, true);
+    // Run matching algorithm in preview mode
+    const result = await matchingService.runMatchingAlgorithm(tempRound.id, true);
 
-      // Delete temporary round
-      await tempRound.destroy();
-
-      res.json({
-        preview: {
-          totalParticipants: result.totalParticipants,
-          totalPairings: result.totalPairings,
-          unpaired: result.unpaired,
-          settings: result.settings
-        },
-        pairings: result.pairings
-      });
-    } catch (error) {
-      // Clean up temporary round on error
-      await tempRound.destroy();
-      throw error;
-    }
+    res.json({
+      preview: {
+        totalParticipants: result.totalParticipants,
+        totalPairings: result.totalPairings,
+        unpaired: result.unpaired,
+        settings: result.settings
+      },
+      pairings: result.pairings
+    });
   } catch (error) {
     logger.error('Preview matching error:', error);
 
@@ -195,6 +192,15 @@ const previewMatching = async (req, res) => {
       error: 'Internal Server Error',
       message: 'Failed to preview matching'
     });
+  } finally {
+    // Always clean up the temporary round
+    if (tempRound) {
+      try {
+        await tempRound.destroy();
+      } catch (cleanupError) {
+        logger.error('Failed to cleanup preview round:', cleanupError);
+      }
+    }
   }
 };
 
@@ -347,6 +353,208 @@ const getEligibleParticipantsCount = async (req, res) => {
   }
 };
 
+/**
+ * Get schedule configuration
+ */
+const getScheduleConfig = async (req, res) => {
+  try {
+    const config = await scheduleService.getScheduleConfig();
+    const presets = scheduleService.getPresets();
+
+    res.json({
+      data: {
+        ...config,
+        presets
+      }
+    });
+  } catch (error) {
+    logger.error('Get schedule config error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch schedule configuration'
+    });
+  }
+};
+
+/**
+ * Update schedule configuration
+ */
+const updateSchedule = async (req, res) => {
+  try {
+    const { scheduleType, nextRunDate, timezone } = req.body;
+
+    if (!scheduleType) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Schedule type is required'
+      });
+    }
+
+    logger.info(`Admin ${req.user.id} updating schedule to ${scheduleType}`, { nextRunDate });
+
+    // Update schedule in settings
+    const result = await scheduleService.updateSchedule(scheduleType, { nextRunDate, timezone });
+
+    // Update the running cron job
+    let jobUpdateSuccess = true;
+    try {
+      await jobOrchestrator.updateJobSchedule('monthlyMatching', result.cronExpression, result.timezone);
+    } catch (jobError) {
+      jobUpdateSuccess = false;
+      logger.error('Failed to update cron job (settings were saved):', jobError);
+    }
+
+    res.json({
+      message: jobUpdateSuccess
+        ? 'Schedule updated successfully'
+        : 'Schedule saved but will take effect after server restart',
+      data: result,
+      jobActive: jobUpdateSuccess
+    });
+  } catch (error) {
+    logger.error('Update schedule error:', error);
+
+    if (error.message.includes('Invalid')) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: error.message
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to update schedule'
+    });
+  }
+};
+
+/**
+ * Toggle auto-scheduling on/off
+ */
+const toggleAutoSchedule = async (req, res) => {
+  try {
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'enabled must be a boolean'
+      });
+    }
+
+    logger.info(`Admin ${req.user.id} ${enabled ? 'enabling' : 'disabling'} auto-schedule`);
+
+    const result = await scheduleService.setAutoScheduleEnabled(enabled);
+
+    res.json({
+      message: `Auto-scheduling ${enabled ? 'enabled' : 'disabled'}`,
+      data: result
+    });
+  } catch (error) {
+    logger.error('Toggle auto-schedule error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to toggle auto-scheduling'
+    });
+  }
+};
+
+/**
+ * Run manual matching with filters
+ */
+const runManualMatching = async (req, res) => {
+  try {
+    const {
+      name,
+      scheduledDate,
+      filters,
+      options = {}
+    } = req.body;
+
+    const date = scheduledDate ? new Date(scheduledDate) : new Date();
+
+    logger.info(`Admin ${req.user.id} running manual matching`, {
+      filters,
+      options
+    });
+
+    const result = await matchingService.createAndExecuteRound(date, name, {
+      source: 'manual',
+      filters: filters || null,
+      ignoreRecentHistory: options.ignoreRecentHistory || false,
+      resetAutoSchedule: options.resetAutoSchedule || false,
+      triggeredByUserId: req.user.id
+    });
+
+    res.json({
+      message: 'Manual matching completed successfully',
+      round: result.round,
+      summary: {
+        totalPairings: result.round.totalPairings,
+        totalParticipants: result.round.totalParticipants,
+        unpaired: result.unpaired,
+        filtersApplied: result.round.filtersApplied,
+        ignoredRecentHistory: result.round.ignoredRecentHistory
+      }
+    });
+  } catch (error) {
+    logger.error('Run manual matching error:', error);
+
+    if (error.message.includes('Not enough eligible participants')) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: error.message
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to run manual matching'
+    });
+  }
+};
+
+/**
+ * Preview matching with filters
+ */
+const previewMatchingWithFilters = async (req, res) => {
+  try {
+    const { filters, options = {} } = req.body;
+
+    logger.info(`Admin ${req.user.id} previewing matching with filters`, { filters, options });
+
+    const result = await matchingService.previewMatchingWithFilters(filters, {
+      ignoreRecentHistory: options.ignoreRecentHistory || false
+    });
+
+    res.json({
+      preview: {
+        totalParticipants: result.totalParticipants,
+        totalPairings: result.totalPairings,
+        unpaired: result.unpaired,
+        settings: result.settings,
+        filters: result.filters,
+        ignoreRecentHistory: result.ignoreRecentHistory
+      },
+      pairings: result.pairings
+    });
+  } catch (error) {
+    logger.error('Preview matching with filters error:', error);
+
+    if (error.message.includes('Not enough eligible participants')) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: error.message
+      });
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to preview matching'
+    });
+  }
+};
+
 module.exports = {
   getMatchingRounds,
   getMatchingRoundById,
@@ -354,5 +562,10 @@ module.exports = {
   runMatching,
   getMatchingSettings,
   updateMatchingSettings,
-  getEligibleParticipantsCount
+  getEligibleParticipantsCount,
+  getScheduleConfig,
+  updateSchedule,
+  toggleAutoSchedule,
+  runManualMatching,
+  previewMatchingWithFilters
 };

@@ -57,6 +57,7 @@ const rawHtml = `
   </div>
   <div class="footer">
     <p>This is an automated message from Coffee Roulette.</p>
+    <p>Next matching round: \${nextMatchingDate} (\${matchingFrequency})</p>
     <p>If you'd like to opt out of future matches, please update your preferences in the app.</p>
   </div>
 </body>
@@ -87,13 +88,22 @@ WHAT'S NEXT?
 View your pairing: \${pairingUrl}
 
 ---
-This is an automated message from Coffee Roulette.`;
+This is an automated message from Coffee Roulette.
+Next matching round: \${nextMatchingDate} (\${matchingFrequency})`;
 
 // Template function for rendering emails
-module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meetingDate, icebreakers, pairingId }) => {
+module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meetingDate, icebreakers, pairingId, matchingFrequency, nextMatchingDate }) => {
   const pairingUrl = buildFrontendUrl(`/pairings/${pairingId}`);
   const formattedDate = meetingDate ? formatDate(meetingDate) : 'To be scheduled';
   const icebreakerList = icebreakers.map(topic => `• ${topic}`).join('\n');
+
+  // Format matching frequency for display
+  const frequencyLabel = matchingFrequency
+    ? matchingFrequency.charAt(0).toUpperCase() + matchingFrequency.slice(1).replace('-', ' ')
+    : 'Monthly';
+
+  // Format next matching date
+  const formattedNextDate = nextMatchingDate ? formatDate(nextMatchingDate) : 'the 1st of next month';
   const icebreakerHTML = icebreakers.map(topic => `<li>${topic}</li>`).join('');
 
   const subject = `☕ Coffee Roulette: You've been matched with ${partnerName}!`;
@@ -237,6 +247,7 @@ module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meet
 
   <div class="footer">
     <p>This is an automated message from Coffee Roulette.</p>
+    <p>Next matching round: ${formattedNextDate} (${frequencyLabel})</p>
     <p>If you'd like to opt out of future matches, please update your preferences in the app.</p>
   </div>
 </body>
@@ -269,6 +280,7 @@ View your pairing: ${pairingUrl}
 
 ---
 This is an automated message from Coffee Roulette.
+Next matching round: ${formattedNextDate} (${frequencyLabel})
 If you'd like to opt out of future matches, please update your preferences in the app.
 `;
 
