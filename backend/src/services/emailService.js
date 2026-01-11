@@ -1,19 +1,11 @@
-const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 const logger = require('../utils/logger');
 const { NotificationTemplate } = require('../models');
 const { interpolate, prepareVariables } = require('../utils/templateInterpolation');
+const microsoftGraphService = require('./microsoftGraphService');
 
 class EmailService {
   constructor() {
-    this.sesClient = new SESClient({
-      region: process.env.AWS_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
-      }
-    });
-
-    this.fromEmail = process.env.EMAIL_FROM || 'noreply@mercator.com';
+    this.fromEmail = process.env.EMAIL_SENDER_ADDRESS || process.env.EMAIL_FROM || 'noreply@mercator.com';
     this.isDevelopment = process.env.NODE_ENV !== 'production';
   }
 
@@ -56,7 +48,7 @@ class EmailService {
   }
 
   /**
-   * Send email via AWS SES
+   * Send email via Microsoft Graph API
    */
   async sendEmail({ to, subject, htmlBody, textBody }) {
     try {
@@ -70,44 +62,15 @@ class EmailService {
         return { messageId: `dev-${Date.now()}`, success: true };
       }
 
-      const params = {
-        Source: this.fromEmail,
-        Destination: {
-          ToAddresses: Array.isArray(to) ? to : [to]
-        },
-        Message: {
-          Subject: {
-            Data: subject,
-            Charset: 'UTF-8'
-          },
-          Body: {
-            Html: {
-              Data: htmlBody,
-              Charset: 'UTF-8'
-            },
-            ...(textBody && {
-              Text: {
-                Data: textBody,
-                Charset: 'UTF-8'
-              }
-            })
-          }
-        }
-      };
-
-      const command = new SendEmailCommand(params);
-      const response = await this.sesClient.send(command);
-
-      logger.info('Email sent successfully:', {
+      // Send via Microsoft Graph
+      const result = await microsoftGraphService.sendEmail({
         to,
         subject,
-        messageId: response.MessageId
+        htmlBody,
+        textBody
       });
 
-      return {
-        messageId: response.MessageId,
-        success: true
-      };
+      return result;
     } catch (error) {
       logger.error('Error sending email:', {
         error: error.message,

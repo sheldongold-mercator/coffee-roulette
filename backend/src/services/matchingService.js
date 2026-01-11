@@ -216,14 +216,12 @@ class MatchingService {
       if (!previewOnly) {
         const savedPairings = await this.savePairings(roundId, pairings, transaction);
 
-        // 7. Assign icebreaker topics
+        // 7. Assign icebreaker topics (within transaction)
         await this.assignIcebreakers(savedPairings, 3, transaction);
 
-        // 8. Schedule meetings (if auto-scheduling enabled)
-        await this.scheduleMeetingsForPairings(savedPairings);
-
-        // 9. Queue notifications for all pairings
-        await this.queueNotificationsForPairings(savedPairings, transaction);
+        // Note: scheduleMeetingsForPairings and queueNotificationsForPairings
+        // are called AFTER transaction commit in createAndExecuteRound
+        // because they need to look up the committed pairing records
 
         return {
           pairings: savedPairings,
@@ -469,6 +467,22 @@ class MatchingService {
       await transaction.commit();
 
       logger.info(`Successfully completed matching round ${round.id}`);
+
+      // Post-commit: Schedule meetings and queue notifications
+      // These need to run after commit because they look up the committed records
+      if (result.pairings && result.pairings.length > 0) {
+        try {
+          await this.scheduleMeetingsForPairings(result.pairings);
+        } catch (err) {
+          logger.error('Error scheduling meetings (non-fatal):', err);
+        }
+
+        try {
+          await this.queueNotificationsForPairings(result.pairings);
+        } catch (err) {
+          logger.error('Error queuing notifications (non-fatal):', err);
+        }
+      }
 
       return {
         round: {

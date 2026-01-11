@@ -221,6 +221,81 @@ class MicrosoftGraphService {
       throw error;
     }
   }
+
+  /**
+   * Send email via Microsoft Graph API
+   * Uses app-only authentication to send on behalf of a configured sender
+   * Requires Mail.Send application permission in Azure AD
+   *
+   * @param {Object} options - Email options
+   * @param {string|string[]} options.to - Recipient email(s)
+   * @param {string} options.subject - Email subject
+   * @param {string} options.htmlBody - HTML content
+   * @param {string} [options.textBody] - Plain text content (optional)
+   * @returns {Object} Send result with success status
+   */
+  async sendEmail({ to, subject, htmlBody, textBody }) {
+    try {
+      const accessToken = await this.getAppAccessToken();
+
+      // The sender user ID or email - must be a valid mailbox in the tenant
+      const senderEmail = process.env.EMAIL_SENDER_ADDRESS || process.env.EMAIL_FROM;
+
+      if (!senderEmail) {
+        throw new Error('EMAIL_SENDER_ADDRESS or EMAIL_FROM not configured');
+      }
+
+      // Format recipients
+      const toRecipients = (Array.isArray(to) ? to : [to]).map(email => ({
+        emailAddress: { address: email }
+      }));
+
+      // Build the message payload
+      const message = {
+        subject,
+        body: {
+          contentType: 'HTML',
+          content: htmlBody
+        },
+        toRecipients
+      };
+
+      // Send the email using the sender's mailbox
+      // Note: The sender must be a valid user/shared mailbox in the tenant
+      const response = await axios.post(
+        `${this.graphApiUrl}/users/${senderEmail}/sendMail`,
+        {
+          message,
+          saveToSentItems: false // Don't clutter the sent folder
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      logger.info('Email sent successfully via Microsoft Graph', {
+        to: Array.isArray(to) ? to : [to],
+        subject
+      });
+
+      return {
+        success: true,
+        messageId: `msgraph-${Date.now()}`,
+        provider: 'microsoft-graph'
+      };
+    } catch (error) {
+      logger.error('Error sending email via Microsoft Graph:', {
+        status: error.response?.status,
+        error: error.response?.data?.error || error.message,
+        to: Array.isArray(to) ? to : [to],
+        subject
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new MicrosoftGraphService();
