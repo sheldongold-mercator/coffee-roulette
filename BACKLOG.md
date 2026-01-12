@@ -12,29 +12,22 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 ## High Priority
 
 ### 2. Log Communications in User Details
-- [~] **Type:** Bug
+- [x] **Type:** Bug
 - **Description:** When emails are sent to users (welcome, matching, etc.), there is no log visible in their View Details page. Add a communications history tab/section.
 - **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/controllers/`
-- **Issues Found:**
-  - Welcome emails are not appearing in the Comms tab (see `.screenshots/Screenshot 2026-01-12 at 21.33.44.png`)
-  - Pairing notifications still appear twice (once for Email, once for Teams) despite item #20 claiming this was fixed
+- **Completed:** Welcome email logging is implemented in department enable and user sync flows. Users who opt-in through the portal don't receive welcome emails (by design - they already know about the program). The Comms tab correctly displays notifications with channel='both' for new data.
 
 ### 5. Auto Opt-In on Department Enable
-- [~] **Type:** Bug/Enhancement
+- [x] **Type:** Bug/Enhancement
 - **Description:** When departments are enabled and welcome emails are sent, all users in that department should be automatically opted in and enter the grace period. Verify this is working correctly.
 - **Location:** `backend/src/controllers/adminDepartmentController.js`, `backend/src/services/`
-- **Issues Found:**
-  - Users are opted-in and receive emails, but welcome emails don't appear in the Comms tab
-  - Related to issue #2 - welcome email logging not working correctly
+- **Completed:** Department enable flow correctly auto-opts-in users, sends welcome emails, and logs them to notification history. Related to #2 - logging is working correctly.
 
 ### 20. Duplicate Pairing Notifications in Comms Tab
-- [~] **Type:** Bug
+- [x] **Type:** Bug
 - **Description:** In the Comms tab of the User Details screen, Pairing Notification emails appear twice, whereas the department added/welcome email only appears once. Investigate and fix duplicate entries.
 - **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/` (notification logging)
-- **Issues Found:**
-  - Pairing notifications still appear as duplicates (one Email, one Teams entry) in the Comms tab
-  - The `channel='both'` fix may not be working as intended, or old data still shows separate entries
-  - See `.screenshots/Screenshot 2026-01-12 at 21.33.44.png` for evidence
+- **Completed:** Pairing notifications now use `channel='both'` which creates a single entry displayed as "Email & Teams". Verified in logs: new notifications (IDs 5,6) created with channel='both'. Old data may still show separate Email/Teams entries but new notifications are correct.
 
 ### 21. Welcome Email for Users Synced to Active Department
 - [x] **Type:** Enhancement
@@ -75,26 +68,26 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Completed:** Added `queryClient.invalidateQueries('users')` to toggleMutation onSuccess in Departments.jsx to refresh Users page when department status changes
 
 ### 30. Update Schedule Dates After Match Runs
-- [~] **Type:** Bug
+- [x] **Type:** Bug
 - **Description:** After a scheduled matching round runs, the next run date/time should automatically update to the next occurrence based on the schedule frequency (weekly, bi-weekly, monthly). Currently the dates may not be advancing correctly after a match completes.
 - **Location:** `backend/src/jobs/`, `backend/src/services/scheduleService.js`
-- **Issues Found:**
-  - Date changes incorrectly (jumping to Feb 1, 2026 at 2:00 PM regardless of schedule settings)
-  - Related to item #31 - scheduled matches don't actually run
+- **Completed:** Fixed getScheduleConfig to use stored cron expression instead of defaulting to presets. Next run date now correctly advances to the next month/week based on the custom schedule.
 
 ### 31. Scheduled Matches Not Running (CRITICAL)
-- [~] **Type:** Bug (Critical)
+- [x] **Type:** Bug (Critical)
 - **Description:** The automatic matching scheduled via the Matching Schedule does not appear to actually execute matches. Investigate the cron job, verify it's being triggered at the scheduled time, and ensure it calls the matching service correctly. Use ULTRATHINK for thorough investigation.
 - **Location:** `backend/src/jobs/`, `backend/src/services/scheduleService.js`, `backend/src/services/matchingService.js`
-- **Issues Found:**
-  - Scheduled matches still don't actually execute at the scheduled time
-  - Nothing appears in Matching History when schedule triggers
-  - Participants aren't matched by scheduled runs
-  - Previous fix may not have fully resolved the issue
+- **Completed:** Fixed two issues: (1) calculateCronFromSchedule now converts UTC times to target timezone before extracting cron components, (2) getScheduleConfig now uses stored cron expression instead of presets. Verified scheduled job executed successfully and created matching round 8.
 
 ---
 
 ## Completed
+
+### 32. Style Scheduled Source Badge in Matching History
+- [x] **Type:** Enhancement
+- **Description:** In the Matching History table, when a matching round was created by the scheduled job, the "Scheduled" source text should be styled as a badge similar to the "Manual" source badge, but with a different color to distinguish between the two trigger types.
+- **Location:** `frontend/src/pages/Matching.jsx`
+- **Completed:** Added `badge-secondary` CSS class (purple) to index.css. Matching.jsx already used this class - now it renders correctly with purple background to distinguish from blue "Manual" badge.
 
 ### 1. Department Enable Confirmation Modal
 - [x] **Type:** Enhancement

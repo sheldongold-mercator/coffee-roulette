@@ -35,7 +35,8 @@ class ScheduleService {
         if (storedNextRunDate && new Date(storedNextRunDate) > new Date()) {
           nextRunDate = storedNextRunDate;
         } else {
-          const effectiveCron = this.presets[scheduleType] || this.presets.monthly;
+          // Use the stored cron expression (which may be custom), fallback to preset
+          const effectiveCron = cronExpression || this.presets[scheduleType] || this.presets.monthly;
           nextRunDate = this.getNextRunDate(effectiveCron, timezone);
         }
       }
@@ -79,8 +80,11 @@ class ScheduleService {
         }
       }
 
-      // Calculate cron expression from schedule type and next run date
-      const effectiveCron = this.calculateCronFromSchedule(scheduleType, nextRunDate);
+      // Get the target timezone
+      const currentTimezone = timezone || await this.getSetting('matching.schedule_timezone', 'America/New_York');
+
+      // Calculate cron expression from schedule type and next run date (converting to target timezone)
+      const effectiveCron = this.calculateCronFromSchedule(scheduleType, nextRunDate, currentTimezone);
 
       // Update settings
       await this.setSetting('matching.schedule_type', scheduleType);
@@ -94,8 +98,6 @@ class ScheduleService {
       if (timezone) {
         await this.setSetting('matching.schedule_timezone', timezone);
       }
-
-      const currentTimezone = timezone || await this.getSetting('matching.schedule_timezone', 'America/New_York');
 
       logger.info(`Schedule updated to ${scheduleType}, next run: ${nextRunDate || 'calculated from cron'}`);
 
@@ -113,17 +115,49 @@ class ScheduleService {
 
   /**
    * Calculate cron expression from schedule type and optional start date
+   * Note: startDate is expected to be in UTC/ISO format, and will be converted
+   * to the target timezone for cron scheduling
    */
-  calculateCronFromSchedule(scheduleType, startDate = null) {
+  calculateCronFromSchedule(scheduleType, startDate = null, timezone = 'America/New_York') {
     if (!startDate) {
       return this.presets[scheduleType] || this.presets.monthly;
     }
 
     const date = new Date(startDate);
-    const minute = date.getMinutes();
-    const hour = date.getHours();
-    const dayOfMonth = date.getDate();
-    const dayOfWeek = date.getDay();
+
+    // Convert UTC date to target timezone to extract correct local time components
+    // This ensures the cron fires at the intended local time
+    const localTimeString = date.toLocaleString('en-US', {
+      timeZone: timezone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      weekday: 'short'
+    });
+
+    // Parse the localized string to extract components
+    // Format: "Mon, 01/12/2026, 17:07" or similar
+    const parts = localTimeString.match(/(\w+),\s*(\d+)\/(\d+)\/(\d+),\s*(\d+):(\d+)/);
+
+    let minute, hour, dayOfMonth, dayOfWeek;
+
+    if (parts) {
+      const weekdayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+      dayOfWeek = weekdayMap[parts[1]] ?? date.getDay();
+      dayOfMonth = parseInt(parts[3], 10);
+      hour = parseInt(parts[5], 10);
+      minute = parseInt(parts[6], 10);
+    } else {
+      // Fallback to UTC if parsing fails
+      minute = date.getUTCMinutes();
+      hour = date.getUTCHours();
+      dayOfMonth = date.getUTCDate();
+      dayOfWeek = date.getUTCDay();
+      logger.warn('Failed to parse localized date, falling back to UTC:', { startDate, localTimeString });
+    }
 
     switch (scheduleType) {
       case 'weekly':
