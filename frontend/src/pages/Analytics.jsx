@@ -6,6 +6,7 @@ import {
   ChartBarIcon,
   TrophyIcon,
   ChatBubbleLeftRightIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import { analyticsAPI } from '../services/api';
 import {
@@ -39,6 +40,11 @@ const Analytics = () => {
   const { data: crossDeptStats, isLoading: crossLoading } = useQuery(
     ['cross-department-stats', 'v2'],
     () => analyticsAPI.getCrossDepartmentStats()
+  );
+
+  const { data: crossSeniorityStats, isLoading: crossSeniorityLoading } = useQuery(
+    ['cross-seniority-stats', 'v2'],
+    () => analyticsAPI.getCrossSeniorityStats()
   );
 
   const { data: leaderboard, isLoading: leaderboardLoading } = useQuery(
@@ -94,6 +100,7 @@ const Analytics = () => {
     : [];
   const feedbackData = feedbackStats?.data?.data || feedbackStats?.data || feedbackStats?.feedback || {};
   const crossDept = crossDeptStats?.data?.data || crossDeptStats?.data || crossDeptStats?.crossDepartment || {};
+  const crossSeniority = crossSeniorityStats?.data?.data || crossSeniorityStats?.data || {};
   const leaders = Array.isArray(leaderboard?.data?.data)
     ? leaderboard.data.data
     : Array.isArray(leaderboard?.data)
@@ -264,6 +271,60 @@ const Analytics = () => {
               </p>
               <p className="text-sm text-gray-600 mt-2">
                 Average Rating
+              </p>
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Cross-Seniority Stats */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="card"
+      >
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center justify-center w-10 h-10 bg-purple-50 rounded-lg">
+            <UserGroupIcon className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Cross-Seniority Connections
+            </h2>
+            <p className="text-sm text-gray-600">
+              Bridging experience levels across the organization
+            </p>
+          </div>
+        </div>
+        {crossSeniorityLoading ? (
+          <div className="h-20 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <p className="text-4xl font-bold text-gray-900">
+                {crossSeniority.crossSeniorityPairings || 0}
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                Cross-Seniority Pairings
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-4xl font-bold text-gray-900">
+                {crossSeniority.crossSeniorityRate || 0}%
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                Of All Pairings
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-4xl font-bold text-gray-900">
+                {crossSeniority.sameSeniorityPairings || 0}
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                Same-Seniority Pairings
               </p>
             </div>
           </div>

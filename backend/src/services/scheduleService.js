@@ -166,12 +166,32 @@ class ScheduleService {
   }
 
   /**
-   * Record that a scheduled run occurred
+   * Record that a scheduled run occurred and calculate next run date
    */
   async recordScheduledRun() {
     const timestamp = new Date().toISOString();
     await this.setSetting('matching.last_scheduled_run_at', timestamp);
-    return timestamp;
+
+    // Calculate and store the next run date based on schedule type
+    try {
+      const scheduleType = await this.getSetting('matching.schedule_type', 'monthly');
+      const timezone = await this.getSetting('matching.schedule_timezone', 'America/New_York');
+      const cronExpression = await this.getSetting('matching.cron_expression', null);
+
+      // Use the stored cron expression or preset
+      const effectiveCron = cronExpression || this.presets[scheduleType] || this.presets.monthly;
+      const nextRunDate = this.getNextRunDate(effectiveCron, timezone);
+
+      if (nextRunDate) {
+        await this.setSetting('matching.next_run_date', nextRunDate);
+        logger.info(`Next scheduled run updated to: ${nextRunDate}`);
+      }
+
+      return { lastRun: timestamp, nextRun: nextRunDate };
+    } catch (error) {
+      logger.error('Error calculating next run date after scheduled run:', error);
+      return { lastRun: timestamp, nextRun: null };
+    }
   }
 
   /**

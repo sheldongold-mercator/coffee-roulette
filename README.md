@@ -100,7 +100,6 @@ coffee-roulette/
 - **Docker Compose**: 2.x or higher
 - **MySQL**: 8.0 (or use Docker)
 - **Azure AD App Registration** (for Microsoft OAuth)
-- **AWS Account** (for SES email service)
 
 ## Getting Started
 
@@ -401,6 +400,7 @@ The pairing algorithm:
 Configured via node-cron with dynamic scheduling:
 - **Matching Rounds**: Configurable (weekly, bi-weekly, or monthly) with manual trigger option
 - **Notification Queue**: Every 5 minutes
+- **Weekly Pairing Reminders**: Every Monday at 9 AM for pending pairings
 - **Meeting Reminders**: 7 days and 1 day before
 - **Feedback Requests**: 1 day after scheduled meeting
 - **User Sync**: Daily from Microsoft Graph API

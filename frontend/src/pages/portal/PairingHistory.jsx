@@ -7,7 +7,10 @@ import {
   XCircleIcon,
   UserIcon,
   CalendarIcon,
+  StarIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { portalAPI } from '../../services/portalAPI';
 
 const statusConfig = {
@@ -31,6 +34,21 @@ const statusConfig = {
     icon: XCircleIcon,
     color: 'text-gray-500 bg-gray-100',
   },
+};
+
+// Star rating display component
+const StarRating = ({ rating }) => {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        star <= rating ? (
+          <StarIconSolid key={star} className="w-4 h-4 text-amber-400" />
+        ) : (
+          <StarIcon key={star} className="w-4 h-4 text-gray-300" />
+        )
+      ))}
+    </div>
+  );
 };
 
 const PairingHistory = () => {
@@ -220,6 +238,52 @@ const PairingHistory = () => {
                             +{pairing.icebreakers.length - 2} more
                           </span>
                         )}
+                      </div>
+                    )}
+
+                    {/* Feedback Section - Show for completed pairings */}
+                    {pairing.status === 'completed' && (pairing.myFeedback || pairing.partnerFeedback) && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
+                          <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                          Feedback
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {/* Your feedback */}
+                          <div className="bg-green-50 rounded-xl p-3">
+                            <p className="text-xs text-green-600 font-medium mb-1">Your feedback</p>
+                            {pairing.myFeedback ? (
+                              <>
+                                <StarRating rating={pairing.myFeedback.rating} />
+                                {pairing.myFeedback.comments && (
+                                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                    "{pairing.myFeedback.comments}"
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-gray-400 italic">Not submitted</p>
+                            )}
+                          </div>
+                          {/* Partner's feedback */}
+                          <div className="bg-blue-50 rounded-xl p-3">
+                            <p className="text-xs text-blue-600 font-medium mb-1">
+                              {pairing.partner?.firstName}'s feedback
+                            </p>
+                            {pairing.partnerFeedback ? (
+                              <>
+                                <StarRating rating={pairing.partnerFeedback.rating} />
+                                {pairing.partnerFeedback.comments && (
+                                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                    "{pairing.partnerFeedback.comments}"
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-gray-400 italic">Not submitted</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

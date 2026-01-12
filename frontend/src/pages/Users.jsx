@@ -15,7 +15,7 @@ const Users = () => {
   const [filters, setFilters] = useState({
     department: '',
     status: '',           // 'active' or 'inactive' - user account status
-    participation: '',    // 'eligible', 'opted_in_excluded', 'opted_out'
+    participation: '',    // 'opted_in', 'opted_in_excluded', 'opted_out', etc.
   });
   const [page, setPage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -162,9 +162,10 @@ const Users = () => {
             className="input"
           >
             <option value="">All Participation</option>
-            <option value="eligible">Eligible</option>
+            <option value="opted_in">Opted In</option>
             <option value="in_grace_period">In Grace Period</option>
-            <option value="opted_in_excluded">Opted In (Dept Excluded)</option>
+            <option value="temporarily_excluded">Temp Opted Out</option>
+            <option value="dept_excluded">Dept Excluded</option>
             <option value="opted_out">Opted Out</option>
           </select>
         </div>
@@ -227,25 +228,56 @@ const Users = () => {
                       </span>
                     </td>
                     <td>
-                      <span
-                        className={`badge ${
-                          user.participationStatus === 'eligible'
-                            ? 'badge-success'
-                            : user.participationStatus === 'in_grace_period'
-                            ? 'badge-info'
-                            : user.participationStatus === 'opted_in_excluded'
-                            ? 'badge-warning'
-                            : 'badge-error'
-                        }`}
-                      >
-                        {user.participationStatus === 'eligible'
-                          ? 'Eligible'
-                          : user.participationStatus === 'in_grace_period'
-                          ? 'Grace Period'
-                          : user.participationStatus === 'opted_in_excluded'
-                          ? 'Dept Excluded'
-                          : 'Opted Out'}
-                      </span>
+                      {(() => {
+                        // Check if department is N/A (unassigned)
+                        const hasDepartment = user.department?.name || user.department;
+                        const deptIsActive = user.department?.isActive !== false;
+
+                        // Determine effective status
+                        let status = user.participationStatus;
+                        let label = '';
+                        let badgeClass = '';
+
+                        // Override status for unassigned department
+                        if (!hasDepartment || hasDepartment === 'N/A') {
+                          status = 'dept_excluded';
+                        }
+
+                        // Also check if opted_in_excluded should map to dept_excluded
+                        if (status === 'opted_in_excluded') {
+                          status = 'dept_excluded';
+                        }
+
+                        switch (status) {
+                          case 'opted_in':
+                            label = 'Opted In';
+                            badgeClass = 'badge-success';
+                            break;
+                          case 'in_grace_period':
+                            label = 'Grace Period';
+                            badgeClass = 'badge-info';
+                            break;
+                          case 'temporarily_excluded':
+                            label = 'Temp Opted Out';
+                            badgeClass = 'badge-warning';
+                            break;
+                          case 'dept_excluded':
+                            label = 'Dept Excluded';
+                            badgeClass = 'badge-warning';
+                            break;
+                          case 'opted_out':
+                          default:
+                            label = 'Opted Out';
+                            badgeClass = 'badge-error';
+                            break;
+                        }
+
+                        return (
+                          <span className={`badge ${badgeClass}`}>
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="text-gray-600">{user.totalPairings || 0}</td>
                     <td>

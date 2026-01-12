@@ -460,19 +460,19 @@ class MatchingService {
   async queueNotificationsForPairings(pairings) {
     try {
       for (const pairing of pairings) {
-        // Queue immediate pairing notifications (email + Teams)
-        await notificationService.queuePairingNotifications(pairing.id, ['email', 'teams']);
+        // Queue immediate pairing notifications (email + Teams via 'both' channel)
+        await notificationService.queuePairingNotifications(pairing.id);
 
         // If meeting is scheduled, queue reminders and feedback
         if (pairing.meeting_scheduled_at) {
           // Queue 7-day reminder
-          await notificationService.queueReminderNotifications(pairing.id, 7, ['email', 'teams']);
+          await notificationService.queueReminderNotifications(pairing.id, 7);
 
           // Queue 1-day reminder
-          await notificationService.queueReminderNotifications(pairing.id, 1, ['email', 'teams']);
+          await notificationService.queueReminderNotifications(pairing.id, 1);
 
           // Queue feedback request (1 day after meeting)
-          await notificationService.queueFeedbackNotifications(pairing.id, ['email', 'teams']);
+          await notificationService.queueFeedbackNotifications(pairing.id);
         }
       }
 

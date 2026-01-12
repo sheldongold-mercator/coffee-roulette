@@ -1,6 +1,7 @@
 const { User, Department, Pairing, MeetingFeedback, MatchingRound, NotificationQueue, SystemSetting } = require('../models');
 const { Op } = require('sequelize');
 const microsoftGraphService = require('../services/microsoftGraphService');
+const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 
 /**
@@ -94,7 +95,7 @@ const getUsers = async (req, res) => {
         return 'in_grace_period';
       }
 
-      return 'eligible';
+      return 'opted_in';
     };
 
     // Filter by participation status if specified
@@ -302,6 +303,8 @@ const getUserById = async (req, res) => {
         seniorityLevel: user.seniority_level,
         isActive: user.is_active,
         isOptedIn: user.is_opted_in,
+        optedInAt: user.opted_in_at,
+        optedOutAt: user.opted_out_at,
         skipGracePeriod: user.skip_grace_period,
         availableFrom: user.available_from,
         overrideDepartmentExclusion: user.override_department_exclusion,
@@ -556,9 +559,11 @@ const syncUsers = async (req, res) => {
       try {
         await emailService.sendWelcomeEmail(user, departmentName);
         await user.update({ welcome_sent_at: new Date() });
+        await notificationService.logWelcomeEmail(user.id, 'sent');
         welcomeEmailsSent++;
         logger.info(`Sent welcome email to new user: ${user.email}`);
       } catch (emailError) {
+        await notificationService.logWelcomeEmail(user.id, 'failed', emailError.message);
         logger.error(`Failed to send welcome email to ${user.email}:`, emailError);
       }
     }

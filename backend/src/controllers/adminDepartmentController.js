@@ -1,5 +1,6 @@
 const { Department, User } = require('../models');
 const { Op } = require('sequelize');
+const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 
 /**
@@ -296,6 +297,15 @@ const enableDepartment = async (req, res) => {
     if (usersToEmail.length > 0) {
       const emailResults = await emailService.sendBulkWelcomeEmails(usersToEmail, department.name);
       emailSentCount = emailResults.filter(r => r.success).length;
+
+      // Log each welcome email to notification history
+      for (const result of emailResults) {
+        await notificationService.logWelcomeEmail(
+          result.userId,
+          result.success ? 'sent' : 'failed',
+          result.success ? null : result.error
+        );
+      }
     }
 
     logger.info(`Admin ${req.user.id} enabled department ${departmentId}: ${department.name}`, {

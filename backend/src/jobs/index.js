@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const { executeMonthlyMatching } = require('./monthlyMatching');
 const notificationProcessingJob = require('./processNotifications');
 const dailyUserSyncJob = require('./dailyUserSync');
+const weeklyRemindersJob = require('./weeklyReminders');
 
 /**
  * Job orchestrator
@@ -31,6 +32,13 @@ class JobOrchestrator {
         name: 'Daily User Sync',
         defaultSchedule: '0 2 * * *',
         description: 'Syncs users from Microsoft Graph every day at 2:00 AM',
+        isDynamic: false,
+        timezone: 'America/New_York'
+      },
+      weeklyReminders: {
+        name: 'Weekly Pairing Reminders',
+        defaultSchedule: '0 9 * * 1',
+        description: 'Sends reminder notifications for pending pairings every Monday at 9:00 AM',
         isDynamic: false,
         timezone: 'America/New_York'
       }
@@ -82,6 +90,7 @@ class JobOrchestrator {
       // Start static jobs
       this.startStaticJob('notificationProcessing', notificationProcessingJob);
       this.startStaticJob('dailyUserSync', dailyUserSyncJob);
+      this.startStaticJob('weeklyReminders', weeklyRemindersJob);
 
       this.isRunning = true;
       logger.info('All scheduled jobs started successfully');
@@ -100,6 +109,13 @@ class JobOrchestrator {
     }
 
     try {
+      // Stop existing job if it exists (for reinitialization scenarios)
+      if (this.cronInstances[jobKey] && typeof this.cronInstances[jobKey].stop === 'function') {
+        this.cronInstances[jobKey].stop();
+        delete this.cronInstances[jobKey];
+        logger.info(`Stopped existing job ${config.name} for reinitialization`);
+      }
+
       // Get schedule from database settings
       const scheduleService = require('../services/scheduleService');
       const scheduleConfig = await scheduleService.getScheduleConfig();
@@ -135,7 +151,8 @@ class JobOrchestrator {
 
       logger.info(`Started dynamic job: ${config.name}`, {
         schedule: schedule,
-        timezone: timezone
+        timezone: timezone,
+        nextRun: scheduleConfig.nextRunDate
       });
     } catch (error) {
       logger.error(`Failed to initialize dynamic job ${jobKey}:`, error);
@@ -257,6 +274,35 @@ class JobOrchestrator {
       };
     } catch (error) {
       logger.error(`Failed to update schedule for ${jobKey}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stop a specific job
+   */
+  stopJob(jobKey) {
+    const config = this.jobConfigs[jobKey];
+    if (!config) {
+      throw new Error(`Job config not found: ${jobKey}`);
+    }
+
+    try {
+      if (this.cronInstances[jobKey] && typeof this.cronInstances[jobKey].stop === 'function') {
+        this.cronInstances[jobKey].stop();
+        delete this.cronInstances[jobKey];
+      }
+
+      // Update job status
+      if (this.jobs[jobKey]) {
+        this.jobs[jobKey].running = false;
+        this.jobs[jobKey].enabled = false;
+      }
+
+      logger.info(`Stopped job: ${config.name}`);
+      return { success: true, message: `Job ${config.name} stopped` };
+    } catch (error) {
+      logger.error(`Failed to stop job ${jobKey}:`, error);
       throw error;
     }
   }

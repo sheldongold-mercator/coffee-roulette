@@ -14,7 +14,9 @@ const {
   updateSchedule,
   toggleAutoSchedule,
   runManualMatching,
-  previewMatchingWithFilters
+  previewMatchingWithFilters,
+  sendRoundReminders,
+  sendAllPendingReminders
 } = require('../../controllers/adminMatchingController');
 
 // Apply authentication and admin authorization to all routes
@@ -44,5 +46,9 @@ router.post('/schedule/toggle', toggleAutoSchedule);
 // Manual matching with filters
 router.post('/run-manual', runManualMatching);
 router.post('/preview-filtered', previewMatchingWithFilters);
+
+// Reminder notifications
+router.post('/rounds/:roundId/send-reminders', sendRoundReminders);
+router.post('/send-all-reminders', sendAllPendingReminders);
 
 module.exports = router;

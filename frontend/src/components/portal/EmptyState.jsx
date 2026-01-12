@@ -19,6 +19,40 @@ const EmptyState = ({ isOptedIn, onOptInSuccess }) => {
     },
   });
 
+  // How it works section - shared between states
+  const HowItWorks = () => (
+    <div className="mt-8 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 rounded-2xl border border-amber-100 p-6 text-left max-w-lg mx-auto">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 bg-white rounded-xl shadow-sm">
+          <span className="text-xl">&#128161;</span>
+        </div>
+        <div>
+          <h4 className="font-semibold text-gray-900 mb-3">
+            How Coffee Roulette Works
+          </h4>
+          <div className="space-y-2 text-sm text-gray-600">
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500 font-bold">1.</span>
+              <span>You get matched with a random colleague each month</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500 font-bold">2.</span>
+              <span>Reach out via email or Teams to schedule a chat</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500 font-bold">3.</span>
+              <span>Meet for 30 minutes - virtual or in-person</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-amber-500 font-bold">4.</span>
+              <span>Mark your meeting complete and share feedback</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (!isOptedIn) {
     return (
       <motion.div
@@ -32,12 +66,13 @@ const EmptyState = ({ isOptedIn, onOptInSuccess }) => {
         <h2 className="text-2xl font-bold text-gray-900 mb-3">
           Join Coffee Roulette!
         </h2>
-        <p className="text-gray-600 max-w-md mx-auto mb-8">
+        <p className="text-gray-600 max-w-md mx-auto mb-6">
           Get matched with a colleague each month for a casual coffee chat.
           It's a great way to meet people from other teams and build connections
           across the company.
         </p>
-        <div className="space-y-4">
+        <HowItWorks />
+        <div className="space-y-4 mt-8">
           <button
             onClick={() => optInMutation.mutate()}
             disabled={optInMutation.isLoading}
@@ -84,6 +119,7 @@ const EmptyState = ({ isOptedIn, onOptInSuccess }) => {
         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         Waiting for next match
       </div>
+      <HowItWorks />
     </motion.div>
   );
 };

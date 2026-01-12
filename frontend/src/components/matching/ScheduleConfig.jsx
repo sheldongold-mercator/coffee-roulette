@@ -5,6 +5,7 @@ import {
   CalendarIcon,
   ClockIcon,
   ChevronDownIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { matchingAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -19,6 +20,11 @@ const ScheduleConfig = () => {
   const dateInputRef = useRef(null);
   const timeInputRef = useRef(null);
 
+  // Local state for pending changes
+  const [localScheduleType, setLocalScheduleType] = useState(null);
+  const [localNextRunDate, setLocalNextRunDate] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false);
+
   const { data: scheduleData, isLoading } = useQuery(
     ['matching-schedule'],
     () => matchingAPI.getSchedule()
@@ -28,6 +34,39 @@ const ScheduleConfig = () => {
     () => scheduleData?.data?.data || scheduleData?.data || {},
     [scheduleData]
   );
+
+  // Initialize local state when config loads
+  useEffect(() => {
+    if (config.scheduleType !== undefined && localScheduleType === null) {
+      setLocalScheduleType(config.scheduleType);
+    }
+    if (config.nextRunDate !== undefined && localNextRunDate === null) {
+      setLocalNextRunDate(config.nextRunDate);
+    }
+  }, [config.scheduleType, config.nextRunDate, localScheduleType, localNextRunDate]);
+
+  // Update hasChanges when local state differs from server state
+  useEffect(() => {
+    if (localScheduleType === null || localNextRunDate === null) {
+      setHasChanges(false);
+      return;
+    }
+    const typeChanged = localScheduleType !== config.scheduleType;
+    const dateChanged = localNextRunDate !== config.nextRunDate;
+    setHasChanges(typeChanged || dateChanged);
+  }, [localScheduleType, localNextRunDate, config.scheduleType, config.nextRunDate]);
+
+  // Warn user about unsaved changes when navigating away
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -46,15 +85,16 @@ const ScheduleConfig = () => {
       onSuccess: (response) => {
         queryClient.invalidateQueries('matching-schedule');
         queryClient.invalidateQueries('job-status');
+        setHasChanges(false);
         const data = response?.data;
         if (data?.jobActive === false) {
           toast.success('Schedule saved! Will take effect after server restart.', { duration: 5000 });
         } else {
-          toast.success('Schedule updated');
+          toast.success('Schedule saved successfully');
         }
       },
       onError: (error) => {
-        toast.error(error.response?.data?.message || 'Failed to update schedule');
+        toast.error(error.response?.data?.message || 'Failed to save schedule');
       },
     }
   );
@@ -64,6 +104,10 @@ const ScheduleConfig = () => {
     {
       onSuccess: (_, enabled) => {
         queryClient.invalidateQueries('matching-schedule');
+        // Reset local state when toggling
+        setLocalScheduleType(null);
+        setLocalNextRunDate(null);
+        setHasChanges(false);
         toast.success(enabled ? 'Automatic matching enabled' : 'Automatic matching disabled');
       },
       onError: (error) => {
@@ -80,69 +124,72 @@ const ScheduleConfig = () => {
 
   const handleToggle = () => {
     if (!toggleAutoScheduleMutation.isLoading) {
+      if (hasChanges) {
+        if (!window.confirm('You have unsaved changes. Toggling will discard them. Continue?')) {
+          return;
+        }
+      }
       toggleAutoScheduleMutation.mutate(!config.enabled);
     }
   };
 
   const handleScheduleTypeChange = (newType) => {
     setShowTypeDropdown(false);
-    if (newType !== config.scheduleType) {
-      updateScheduleMutation.mutate({
-        scheduleType: newType,
-        nextRunDate: config.nextRunDate,
-      });
-    }
+    setLocalScheduleType(newType);
   };
 
   const handleDateChange = (e) => {
     const newDate = e.target.value;
-    if (newDate && config.nextRunDate) {
-      const currentDate = new Date(config.nextRunDate);
+    const currentDate = localNextRunDate ? new Date(localNextRunDate) : new Date();
+    if (newDate) {
       const [year, month, day] = newDate.split('-').map(Number);
       const newDateTime = new Date(currentDate);
       newDateTime.setFullYear(year, month - 1, day);
-
-      const now = new Date();
-      if (newDateTime > now) {
-        updateScheduleMutation.mutate({
-          scheduleType: config.scheduleType,
-          nextRunDate: newDateTime.toISOString(),
-        });
-      } else {
-        // Check if user selected today - if so, they need to also update the time
-        const isToday = newDateTime.toDateString() === now.toDateString();
-        if (isToday) {
-          toast.error('For today\'s date, please also set a time later than now');
-        } else {
-          toast.error('Date must be in the future');
-        }
-      }
+      setLocalNextRunDate(newDateTime.toISOString());
     }
     setEditingDate(false);
   };
 
   const handleTimeChange = (e) => {
     const newTime = e.target.value;
-    if (newTime && config.nextRunDate) {
-      const currentDate = new Date(config.nextRunDate);
+    const currentDate = localNextRunDate ? new Date(localNextRunDate) : new Date();
+    if (newTime) {
       const [hours, minutes] = newTime.split(':').map(Number);
       const newDateTime = new Date(currentDate);
       newDateTime.setHours(hours, minutes, 0, 0);
-
-      if (newDateTime > new Date()) {
-        updateScheduleMutation.mutate({
-          scheduleType: config.scheduleType,
-          nextRunDate: newDateTime.toISOString(),
-        });
-      } else {
-        toast.error('Time must be in the future');
-      }
+      setLocalNextRunDate(newDateTime.toISOString());
     }
     setEditingTime(false);
   };
 
-  const currentTypeOption = scheduleTypeOptions.find(o => o.value === config.scheduleType) || scheduleTypeOptions[2];
-  const nextRunDate = config.nextRunDate ? new Date(config.nextRunDate) : null;
+  const handleSave = () => {
+    // Validate before saving
+    if (localNextRunDate) {
+      const dateToSave = new Date(localNextRunDate);
+      if (dateToSave <= new Date()) {
+        toast.error('Scheduled date and time must be in the future');
+        return;
+      }
+    }
+
+    updateScheduleMutation.mutate({
+      scheduleType: localScheduleType,
+      nextRunDate: localNextRunDate,
+    });
+  };
+
+  const handleDiscard = () => {
+    setLocalScheduleType(config.scheduleType);
+    setLocalNextRunDate(config.nextRunDate);
+    setHasChanges(false);
+    toast.success('Changes discarded');
+  };
+
+  // Use local values for display, fallback to config
+  const displayScheduleType = localScheduleType || config.scheduleType;
+  const displayNextRunDate = localNextRunDate || config.nextRunDate;
+  const currentTypeOption = scheduleTypeOptions.find(o => o.value === displayScheduleType) || scheduleTypeOptions[2];
+  const nextRunDate = displayNextRunDate ? new Date(displayNextRunDate) : null;
 
   if (isLoading) {
     return (
@@ -193,6 +240,21 @@ const ScheduleConfig = () => {
         </div>
       </div>
 
+      {/* Unsaved Changes Indicator */}
+      <AnimatePresence>
+        {hasChanges && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2"
+          >
+            <ExclamationCircleIcon className="w-4 h-4 text-amber-600" />
+            <span className="text-sm text-amber-700">You have unsaved changes</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Schedule Settings */}
       <AnimatePresence>
         {config.enabled && (
@@ -235,10 +297,10 @@ const ScheduleConfig = () => {
                           onClick={() => handleScheduleTypeChange(option.value)}
                           aria-label={`Schedule matching ${option.label.toLowerCase()}`}
                           className={`w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors ${
-                            option.value === config.scheduleType ? 'bg-sky-50' : ''
+                            option.value === displayScheduleType ? 'bg-sky-50' : ''
                           }`}
                         >
-                          <div className={`text-sm font-medium ${option.value === config.scheduleType ? 'text-sky-700' : 'text-gray-900'}`}>
+                          <div className={`text-sm font-medium ${option.value === displayScheduleType ? 'text-sky-700' : 'text-gray-900'}`}>
                             {option.label}
                           </div>
                           <div className="text-xs text-gray-500">{option.description}</div>
@@ -319,6 +381,33 @@ const ScheduleConfig = () => {
             <p className="text-xs text-gray-500 pt-2 border-t border-gray-100">
               Matching will run {currentTypeOption.label.toLowerCase()} starting from the scheduled date.
             </p>
+
+            {/* Save/Discard Buttons */}
+            <AnimatePresence>
+              {hasChanges && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200"
+                >
+                  <button
+                    onClick={handleDiscard}
+                    disabled={updateScheduleMutation.isLoading}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={updateScheduleMutation.isLoading}
+                    className="btn btn-primary btn-sm"
+                  >
+                    {updateScheduleMutation.isLoading ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

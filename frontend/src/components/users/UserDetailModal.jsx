@@ -50,6 +50,7 @@ const notificationStatusConfig = {
 };
 
 const notificationTypeConfig = {
+  welcome: { label: 'Welcome Email', icon: EnvelopeIcon },
   pairing: { label: 'Pairing Notification', icon: ChatBubbleLeftRightIcon },
   reminder: { label: 'Meeting Reminder', icon: CalendarIcon },
   feedback_request: { label: 'Feedback Request', icon: StarIcon },
@@ -93,7 +94,7 @@ const UserDetailModal = ({ userId, onClose }) => {
         departmentId: user.department?.id || '',
         seniorityLevel: user.seniorityLevel || '',
         isActive: user.isActive ?? true,
-        isOptedIn: user.isOptedIn ?? true,
+        isOptedIn: user.isOptedIn ?? false,
         // Matching settings
         skipGracePeriod: user.skipGracePeriod ?? false,
         availableFrom: user.availableFrom || '',
@@ -183,6 +184,89 @@ const UserDetailModal = ({ userId, onClose }) => {
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Participation Status Card */}
+        {user && (
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            {(() => {
+              // Calculate participation status (same logic as Users.jsx)
+              const hasDepartment = user.department?.name;
+              const deptIsActive = user.department?.isActive !== false;
+              const hasAvailableFrom = user.availableFrom && new Date(user.availableFrom) > new Date();
+
+              // Calculate if in grace period (48 hours from opted_in_at)
+              const isInGracePeriod = user.isOptedIn && user.optedInAt && !user.skipGracePeriod && (() => {
+                const optedInDate = new Date(user.optedInAt);
+                const gracePeriodEnd = new Date(optedInDate.getTime() + 48 * 60 * 60 * 1000);
+                return new Date() < gracePeriodEnd;
+              })();
+
+              let status = '';
+              let statusLabel = '';
+              let statusClass = '';
+              let dateLabel = '';
+              let dateValue = '';
+
+              if (!hasDepartment) {
+                status = 'dept_excluded';
+                statusLabel = 'Dept Excluded';
+                statusClass = 'bg-amber-100 text-amber-700';
+                dateLabel = 'No department assigned';
+              } else if (!deptIsActive && !user.overrideDepartmentExclusion) {
+                status = 'dept_excluded';
+                statusLabel = 'Dept Excluded';
+                statusClass = 'bg-amber-100 text-amber-700';
+                dateLabel = 'Department is inactive';
+              } else if (hasAvailableFrom) {
+                status = 'temp_opted_out';
+                statusLabel = 'Temp Opted Out';
+                statusClass = 'bg-orange-100 text-orange-700';
+                dateLabel = 'Available from';
+                dateValue = new Date(user.availableFrom).toLocaleDateString();
+              } else if (!user.isOptedIn) {
+                status = 'opted_out';
+                statusLabel = 'Opted Out';
+                statusClass = 'bg-red-100 text-red-700';
+                if (user.optedOutAt) {
+                  dateLabel = 'Opted out on';
+                  dateValue = new Date(user.optedOutAt).toLocaleDateString();
+                }
+              } else if (isInGracePeriod) {
+                status = 'in_grace_period';
+                statusLabel = 'Grace Period';
+                statusClass = 'bg-blue-100 text-blue-700';
+                const optedInDate = new Date(user.optedInAt);
+                const gracePeriodEnd = new Date(optedInDate.getTime() + 48 * 60 * 60 * 1000);
+                dateLabel = 'Grace period ends';
+                dateValue = gracePeriodEnd.toLocaleString();
+              } else {
+                status = 'opted_in';
+                statusLabel = 'Opted In';
+                statusClass = 'bg-green-100 text-green-700';
+                if (user.optedInAt) {
+                  dateLabel = 'Opted in on';
+                  dateValue = new Date(user.optedInAt).toLocaleDateString();
+                }
+              }
+
+              return (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600">Participation Status:</span>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusClass}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                  {(dateLabel || dateValue) && (
+                    <div className="text-sm text-gray-600">
+                      {dateLabel}{dateValue && `: ${dateValue}`}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="px-6 border-b border-gray-200">
@@ -398,12 +482,12 @@ const UserDetailModal = ({ userId, onClose }) => {
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={formData.isOptedIn ?? true}
+                    checked={formData.isOptedIn ?? false}
                     onChange={(e) => handleInputChange('isOptedIn', e.target.checked)}
                     className="mt-0.5 w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />
                   <div>
-                    <span className="text-sm font-medium text-gray-700">Opted into Matching</span>
+                    <span className="text-sm font-medium text-gray-700">Opted Into Matching</span>
                     <p className="text-xs text-gray-500">User will be included in matching rounds when enabled</p>
                   </div>
                 </label>

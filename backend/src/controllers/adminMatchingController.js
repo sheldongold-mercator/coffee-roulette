@@ -1,5 +1,6 @@
-const { MatchingRound, Pairing, SystemSetting } = require('../models');
+const { MatchingRound, Pairing, SystemSetting, MeetingFeedback } = require('../models');
 const matchingService = require('../services/matchingService');
+const notificationService = require('../services/notificationService');
 const scheduleService = require('../services/scheduleService');
 const jobOrchestrator = require('../jobs');
 const { getStartOfNextMonth } = require('../utils/helpers');
@@ -88,6 +89,10 @@ const getMatchingRoundById = async (req, res) => {
               association: 'icebreakers',
               attributes: ['id', 'topic', 'category'],
               through: { attributes: [] }
+            },
+            {
+              association: 'feedback',
+              attributes: ['id', 'user_id', 'rating', 'comments', 'created_at']
             }
           ]
         }
@@ -114,32 +119,48 @@ const getMatchingRoundById = async (req, res) => {
         createdAt: round.created_at,
         source: round.source || null
       },
-      pairings: (round.pairings || []).map(pairing => ({
-        id: pairing.id,
-        user1: pairing.user1 ? {
-          id: pairing.user1.id,
-          firstName: pairing.user1.first_name,
-          lastName: pairing.user1.last_name,
-          email: pairing.user1.email,
-          department: pairing.user1.department ? pairing.user1.department.name : null
-        } : { firstName: 'Unknown', lastName: 'User', department: null },
-        user2: pairing.user2 ? {
-          id: pairing.user2.id,
-          firstName: pairing.user2.first_name,
-          lastName: pairing.user2.last_name,
-          email: pairing.user2.email,
-          department: pairing.user2.department ? pairing.user2.department.name : null
-        } : { firstName: 'Unknown', lastName: 'User', department: null },
-        status: pairing.status,
-        meetingScheduledAt: pairing.meeting_scheduled_at,
-        meetingCompletedAt: pairing.meeting_completed_at,
-        icebreakers: (pairing.icebreakers || []).map(ib => ({
-          id: ib.id,
-          topic: ib.topic,
-          category: ib.category
-        })),
-        createdAt: pairing.created_at
-      }))
+      pairings: (round.pairings || []).map(pairing => {
+        const feedbackList = pairing.feedback || [];
+        const user1Feedback = pairing.user1 ? feedbackList.find(f => f.user_id === pairing.user1.id) : null;
+        const user2Feedback = pairing.user2 ? feedbackList.find(f => f.user_id === pairing.user2.id) : null;
+
+        return {
+          id: pairing.id,
+          user1: pairing.user1 ? {
+            id: pairing.user1.id,
+            firstName: pairing.user1.first_name,
+            lastName: pairing.user1.last_name,
+            email: pairing.user1.email,
+            department: pairing.user1.department ? pairing.user1.department.name : null,
+            feedback: user1Feedback ? {
+              rating: user1Feedback.rating,
+              comments: user1Feedback.comments,
+              submittedAt: user1Feedback.created_at
+            } : null
+          } : { firstName: 'Unknown', lastName: 'User', department: null, feedback: null },
+          user2: pairing.user2 ? {
+            id: pairing.user2.id,
+            firstName: pairing.user2.first_name,
+            lastName: pairing.user2.last_name,
+            email: pairing.user2.email,
+            department: pairing.user2.department ? pairing.user2.department.name : null,
+            feedback: user2Feedback ? {
+              rating: user2Feedback.rating,
+              comments: user2Feedback.comments,
+              submittedAt: user2Feedback.created_at
+            } : null
+          } : { firstName: 'Unknown', lastName: 'User', department: null, feedback: null },
+          status: pairing.status,
+          meetingScheduledAt: pairing.meeting_scheduled_at,
+          meetingCompletedAt: pairing.meeting_completed_at,
+          icebreakers: (pairing.icebreakers || []).map(ib => ({
+            id: ib.id,
+            topic: ib.topic,
+            category: ib.category
+          })),
+          createdAt: pairing.created_at
+        };
+      })
     });
   } catch (error) {
     logger.error('Get matching round by ID error:', error);
@@ -395,10 +416,10 @@ const updateSchedule = async (req, res) => {
     // Update schedule in settings
     const result = await scheduleService.updateSchedule(scheduleType, { nextRunDate, timezone });
 
-    // Update the running cron job
+    // Reinitialize the cron job (this respects the enabled state)
     let jobUpdateSuccess = true;
     try {
-      await jobOrchestrator.updateJobSchedule('monthlyMatching', result.cronExpression, result.timezone);
+      await jobOrchestrator.initializeDynamicJob('monthlyMatching');
     } catch (jobError) {
       jobUpdateSuccess = false;
       logger.error('Failed to update cron job (settings were saved):', jobError);
@@ -446,9 +467,25 @@ const toggleAutoSchedule = async (req, res) => {
 
     const result = await scheduleService.setAutoScheduleEnabled(enabled);
 
+    // Also manage the cron job
+    let jobActive = true;
+    try {
+      if (enabled) {
+        // When enabling, initialize the dynamic job with current schedule
+        await jobOrchestrator.initializeDynamicJob('monthlyMatching');
+      } else {
+        // When disabling, stop the cron job
+        jobOrchestrator.stopJob('monthlyMatching');
+      }
+    } catch (jobError) {
+      jobActive = false;
+      logger.error('Failed to update cron job (setting was saved):', jobError);
+    }
+
     res.json({
       message: `Auto-scheduling ${enabled ? 'enabled' : 'disabled'}`,
-      data: result
+      data: result,
+      jobActive
     });
   } catch (error) {
     logger.error('Toggle auto-schedule error:', error);
@@ -555,6 +592,71 @@ const previewMatchingWithFilters = async (req, res) => {
   }
 };
 
+/**
+ * Send reminder notifications for pending pairings in a round
+ */
+const sendRoundReminders = async (req, res) => {
+  try {
+    const { roundId } = req.params;
+
+    // Verify round exists
+    const round = await MatchingRound.findByPk(roundId);
+    if (!round) {
+      return res.status(404).json({
+        error: 'Not Found',
+        message: 'Matching round not found'
+      });
+    }
+
+    logger.info(`Admin ${req.user.id} triggered reminders for round ${roundId}`);
+
+    const result = await notificationService.sendRemindersForPendingPairings(roundId);
+
+    res.json({
+      message: result.pairings > 0
+        ? `Queued ${result.sent} reminder notifications for ${result.pairings} pending pairings`
+        : 'No pending pairings found in this round',
+      data: {
+        notificationsQueued: result.sent,
+        pairingsFound: result.pairings
+      }
+    });
+  } catch (error) {
+    logger.error('Send round reminders error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to send reminders'
+    });
+  }
+};
+
+/**
+ * Send reminder notifications for all pending pairings (across all rounds)
+ */
+const sendAllPendingReminders = async (req, res) => {
+  try {
+    logger.info(`Admin ${req.user.id} triggered reminders for all pending pairings`);
+
+    const result = await notificationService.sendRemindersForPendingPairings();
+
+    res.json({
+      message: result.pairings > 0
+        ? `Queued ${result.sent} reminder notifications for ${result.pairings} pending pairings`
+        : 'No pending pairings found',
+      data: {
+        notificationsQueued: result.sent,
+        pairingsFound: result.pairings
+      }
+    });
+  } catch (error) {
+    logger.error('Send all pending reminders error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to send reminders'
+    });
+  }
+};
+
 module.exports = {
   getMatchingRounds,
   getMatchingRoundById,
@@ -567,5 +669,7 @@ module.exports = {
   updateSchedule,
   toggleAutoSchedule,
   runManualMatching,
-  previewMatchingWithFilters
+  previewMatchingWithFilters,
+  sendRoundReminders,
+  sendAllPendingReminders
 };

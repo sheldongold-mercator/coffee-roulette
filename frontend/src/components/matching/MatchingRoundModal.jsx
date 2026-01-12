@@ -1,5 +1,5 @@
-import React from 'react';
-import { useQuery } from 'react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation } from 'react-query';
 import { motion } from 'framer-motion';
 import {
   XMarkIcon,
@@ -8,7 +8,10 @@ import {
   CheckCircleIcon,
   CalendarIcon,
   ChatBubbleLeftIcon,
+  StarIcon,
+  BellAlertIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { matchingAPI } from '../../services/api';
 import { format } from 'date-fns';
 
@@ -19,16 +22,58 @@ const statusConfig = {
   cancelled: { label: 'Cancelled', color: 'text-gray-500 bg-gray-100' },
 };
 
+// Star rating display component
+const StarRating = ({ rating }) => {
+  if (!rating) return null;
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        star <= rating ? (
+          <StarIconSolid key={star} className="w-3 h-3 text-amber-400" />
+        ) : (
+          <StarIcon key={star} className="w-3 h-3 text-gray-300" />
+        )
+      ))}
+    </div>
+  );
+};
+
 const MatchingRoundModal = ({ roundId, onClose }) => {
+  const [reminderResult, setReminderResult] = useState(null);
+
   const { data: roundData, isLoading } = useQuery(
     ['matching-round', roundId],
     () => matchingAPI.getRoundById(roundId),
     { enabled: !!roundId }
   );
 
+  const sendRemindersMutation = useMutation(
+    () => matchingAPI.sendRoundReminders(roundId),
+    {
+      onSuccess: (response) => {
+        const data = response?.data?.data || response?.data;
+        setReminderResult({
+          success: true,
+          message: `Sent ${data?.notificationsQueued || 0} reminders for ${data?.pairingsFound || 0} pairings`
+        });
+        setTimeout(() => setReminderResult(null), 5000);
+      },
+      onError: (error) => {
+        setReminderResult({
+          success: false,
+          message: error?.response?.data?.message || 'Failed to send reminders'
+        });
+        setTimeout(() => setReminderResult(null), 5000);
+      }
+    }
+  );
+
   const apiResponse = roundData?.data || roundData;
   const round = apiResponse?.round;
   const pairings = apiResponse?.pairings || [];
+
+  // Count pending pairings (not completed or cancelled)
+  const pendingPairings = pairings.filter(p => p.status === 'pending' || p.status === 'confirmed');
 
   return (
     <motion.div
@@ -62,13 +107,32 @@ const MatchingRoundModal = ({ roundId, onClose }) => {
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <XMarkIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {pendingPairings.length > 0 && (
+              <button
+                onClick={() => sendRemindersMutation.mutate()}
+                disabled={sendRemindersMutation.isLoading}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <BellAlertIcon className="w-4 h-4" />
+                {sendRemindersMutation.isLoading ? 'Sending...' : `Send Reminders (${pendingPairings.length})`}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+
+        {/* Reminder Result Toast */}
+        {reminderResult && (
+          <div className={`px-6 py-3 ${reminderResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {reminderResult.message}
+          </div>
+        )}
 
         {/* Content */}
         <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
@@ -139,6 +203,11 @@ const MatchingRoundModal = ({ roundId, onClose }) => {
                                 <p className="text-sm text-gray-500">
                                   {pairing.user1?.department || 'No department'}
                                 </p>
+                                {pairing.user1?.feedback && (
+                                  <div className="mt-1">
+                                    <StarRating rating={pairing.user1.feedback.rating} />
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -159,6 +228,11 @@ const MatchingRoundModal = ({ roundId, onClose }) => {
                                 <p className="text-sm text-gray-500">
                                   {pairing.user2?.department || 'No department'}
                                 </p>
+                                {pairing.user2?.feedback && (
+                                  <div className="mt-1">
+                                    <StarRating rating={pairing.user2.feedback.rating} />
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -206,6 +280,38 @@ const MatchingRoundModal = ({ roundId, onClose }) => {
                                   {ib.topic}
                                 </span>
                               ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Feedback Comments */}
+                        {(pairing.user1?.feedback?.comments || pairing.user2?.feedback?.comments) && (
+                          <div className="mt-3 pt-3 border-t border-gray-100">
+                            <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                              <ChatBubbleLeftIcon className="w-4 h-4" />
+                              <span>Feedback comments:</span>
+                            </div>
+                            <div className="grid sm:grid-cols-2 gap-3">
+                              {pairing.user1?.feedback?.comments && (
+                                <div className="bg-gray-50 rounded-lg p-2">
+                                  <p className="text-xs text-gray-500 mb-1">
+                                    {pairing.user1.firstName}:
+                                  </p>
+                                  <p className="text-sm text-gray-700">
+                                    "{pairing.user1.feedback.comments}"
+                                  </p>
+                                </div>
+                              )}
+                              {pairing.user2?.feedback?.comments && (
+                                <div className="bg-gray-50 rounded-lg p-2">
+                                  <p className="text-xs text-gray-500 mb-1">
+                                    {pairing.user2.firstName}:
+                                  </p>
+                                  <p className="text-sm text-gray-700">
+                                    "{pairing.user2.feedback.comments}"
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}

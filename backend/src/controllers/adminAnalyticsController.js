@@ -132,6 +132,23 @@ const getCrossDepartmentStats = async (req, res) => {
 };
 
 /**
+ * Get cross-seniority statistics
+ */
+const getCrossSeniorityStats = async (req, res) => {
+  try {
+    const data = await analyticsService.getCrossSeniorityStats();
+
+    res.json({ data });
+  } catch (error) {
+    logger.error('Get cross-seniority stats error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch cross-seniority statistics'
+    });
+  }
+};
+
+/**
  * Get engagement leaderboard
  */
 const getEngagementLeaderboard = async (req, res) => {
@@ -373,6 +390,7 @@ module.exports = {
   getDepartmentStats,
   getFeedbackStats,
   getCrossDepartmentStats,
+  getCrossSeniorityStats,
   getEngagementLeaderboard,
   getRecentActivity,
   exportUsers,

@@ -1,5 +1,6 @@
 const { User, Pairing, MeetingFeedback, MatchingRound } = require('../models');
 const { Op } = require('sequelize');
+const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 
 /**
@@ -24,6 +25,7 @@ const getProfile = async (req, res) => {
         seniorityLevel: user.seniority_level,
         isOptedIn: user.is_opted_in,
         isActive: user.is_active,
+        availableFrom: user.available_from,
         lastSyncedAt: user.last_synced_at,
         createdAt: user.created_at
       }
@@ -101,8 +103,14 @@ const optIn = async (req, res) => {
       });
     }
 
-    await user.update({ is_opted_in: true });
-    logger.info(`User ${user.id} opted in to Coffee Roulette`);
+    // When user manually opts in via Portal, skip the grace period
+    // so they can participate in the next matching round immediately
+    await user.update({
+      is_opted_in: true,
+      opted_in_at: new Date(),
+      skip_grace_period: true
+    });
+    logger.info(`User ${user.id} opted in to Coffee Roulette (grace period skipped)`);
 
     res.json({
       message: 'Successfully opted in to Coffee Roulette',
@@ -179,6 +187,10 @@ const getPairings = async (req, res) => {
           association: 'icebreakers',
           attributes: ['id', 'topic', 'category'],
           through: { attributes: [] }
+        },
+        {
+          association: 'feedback',
+          attributes: ['id', 'user_id', 'rating', 'comments', 'created_at']
         }
       ],
       order: [['created_at', 'DESC']],
@@ -188,6 +200,11 @@ const getPairings = async (req, res) => {
 
     const formattedPairings = pairings.rows.map(pairing => {
       const partner = pairing.user1_id === user.id ? pairing.user2 : pairing.user1;
+      const feedbackList = pairing.feedback || [];
+
+      // Get user's own feedback and partner's feedback
+      const myFeedback = feedbackList.find(f => f.user_id === user.id);
+      const partnerFeedback = feedbackList.find(f => f.user_id === partner.id);
 
       return {
         id: pairing.id,
@@ -211,6 +228,16 @@ const getPairings = async (req, res) => {
           topic: ib.topic,
           category: ib.category
         })),
+        myFeedback: myFeedback ? {
+          rating: myFeedback.rating,
+          comments: myFeedback.comments,
+          submittedAt: myFeedback.created_at
+        } : null,
+        partnerFeedback: partnerFeedback ? {
+          rating: partnerFeedback.rating,
+          comments: partnerFeedback.comments,
+          submittedAt: partnerFeedback.created_at
+        } : null,
         createdAt: pairing.created_at
       };
     });
@@ -365,6 +392,14 @@ const confirmMeeting = async (req, res) => {
       });
 
       logger.info(`User ${user.id} confirmed meeting completion for pairing ${pairingId}`);
+
+      // Notify the partner that the meeting was confirmed and ask for feedback
+      try {
+        await notificationService.notifyPartnerMeetingConfirmed(pairingId, user.id);
+      } catch (notifyError) {
+        // Log but don't fail the request if notification fails
+        logger.error('Failed to notify partner of meeting confirmation:', notifyError);
+      }
     }
 
     res.json({
@@ -459,11 +494,67 @@ const submitFeedback = async (req, res) => {
   }
 };
 
+/**
+ * Set availability date (temporary opt-out)
+ * Users can set a future date when they'll be available again
+ */
+const setAvailability = async (req, res) => {
+  try {
+    const user = req.user;
+    const { availableFrom } = req.body;
+
+    // Validate the date if provided
+    if (availableFrom) {
+      const date = new Date(availableFrom);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid date format'
+        });
+      }
+
+      // Date must be in the future
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (date < today) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Available from date must be today or in the future'
+        });
+      }
+    }
+
+    await user.update({
+      available_from: availableFrom || null
+    });
+
+    if (availableFrom) {
+      logger.info(`User ${user.id} set temporary opt-out until ${availableFrom}`);
+    } else {
+      logger.info(`User ${user.id} cleared their availability date`);
+    }
+
+    res.json({
+      message: availableFrom
+        ? 'Availability date set successfully'
+        : 'Availability date cleared',
+      availableFrom: user.available_from
+    });
+  } catch (error) {
+    logger.error('Set availability error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to set availability'
+    });
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
   optIn,
   optOut,
+  setAvailability,
   getPairings,
   getCurrentPairing,
   confirmMeeting,

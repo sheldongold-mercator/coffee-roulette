@@ -9,6 +9,7 @@ const {
   getDepartmentStats,
   getFeedbackStats,
   getCrossDepartmentStats,
+  getCrossSeniorityStats,
   getEngagementLeaderboard,
   getRecentActivity,
   exportUsers,
@@ -28,6 +29,7 @@ router.get('/trends/completion', getCompletionTrends);
 router.get('/departments', getDepartmentStats);
 router.get('/feedback', getFeedbackStats);
 router.get('/cross-department', getCrossDepartmentStats);
+router.get('/cross-seniority', getCrossSeniorityStats);
 router.get('/leaderboard', getEngagementLeaderboard);
 router.get('/activity', getRecentActivity);
 

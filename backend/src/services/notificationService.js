@@ -34,9 +34,40 @@ class NotificationService {
   }
 
   /**
-   * Queue pairing notifications for both users
+   * Log a welcome email that was sent
+   * Welcome emails are sent directly (not queued) so we log them after sending
    */
-  async queuePairingNotifications(pairingId, channels = ['email', 'teams']) {
+  async logWelcomeEmail(recipientId, status = 'sent', errorMessage = null) {
+    try {
+      const notification = await NotificationQueue.create({
+        pairing_id: null,
+        recipient_user_id: recipientId,
+        notification_type: 'welcome',
+        channel: 'email',
+        status,
+        scheduled_for: new Date(),
+        sent_at: status === 'sent' ? new Date() : null,
+        error_message: errorMessage
+      });
+
+      logger.info('Welcome email logged:', {
+        id: notification.id,
+        recipient: recipientId,
+        status
+      });
+
+      return notification;
+    } catch (error) {
+      logger.error('Error logging welcome email:', error);
+      // Don't throw - logging failure shouldn't block the main flow
+    }
+  }
+
+  /**
+   * Queue pairing notifications for both users
+   * Uses channel='both' to create a single notification entry that sends to both email and Teams
+   */
+  async queuePairingNotifications(pairingId) {
     const pairing = await Pairing.findByPk(pairingId);
     if (!pairing) {
       throw new Error('Pairing not found');
@@ -44,27 +75,25 @@ class NotificationService {
 
     const notifications = [];
 
-    for (const channel of channels) {
-      // Queue for user1
-      notifications.push(
-        await this.queueNotification({
-          pairingId,
-          recipientId: pairing.user1_id,
-          notificationType: 'pairing',
-          channel
-        })
-      );
+    // Queue single notification per user with channel='both'
+    // This creates one entry in Comms tab that sends to both email and Teams
+    notifications.push(
+      await this.queueNotification({
+        pairingId,
+        recipientId: pairing.user1_id,
+        notificationType: 'pairing',
+        channel: 'both'
+      })
+    );
 
-      // Queue for user2
-      notifications.push(
-        await this.queueNotification({
-          pairingId,
-          recipientId: pairing.user2_id,
-          notificationType: 'pairing',
-          channel
-        })
-      );
-    }
+    notifications.push(
+      await this.queueNotification({
+        pairingId,
+        recipientId: pairing.user2_id,
+        notificationType: 'pairing',
+        channel: 'both'
+      })
+    );
 
     logger.info(`Queued ${notifications.length} pairing notifications for pairing ${pairingId}`);
     return notifications;
@@ -72,8 +101,9 @@ class NotificationService {
 
   /**
    * Queue reminder notifications
+   * Uses channel='both' to create a single notification entry per user
    */
-  async queueReminderNotifications(pairingId, daysUntil, channels = ['email', 'teams']) {
+  async queueReminderNotifications(pairingId, daysUntil) {
     const pairing = await Pairing.findByPk(pairingId);
     if (!pairing || !pairing.meeting_scheduled_at) {
       return [];
@@ -84,29 +114,26 @@ class NotificationService {
 
     const notifications = [];
 
-    for (const channel of channels) {
-      // Queue for user1
-      notifications.push(
-        await this.queueNotification({
-          pairingId,
-          recipientId: pairing.user1_id,
-          notificationType: 'reminder',
-          channel,
-          scheduledFor
-        })
-      );
+    // Queue single notification per user with channel='both'
+    notifications.push(
+      await this.queueNotification({
+        pairingId,
+        recipientId: pairing.user1_id,
+        notificationType: 'reminder',
+        channel: 'both',
+        scheduledFor
+      })
+    );
 
-      // Queue for user2
-      notifications.push(
-        await this.queueNotification({
-          pairingId,
-          recipientId: pairing.user2_id,
-          notificationType: 'reminder',
-          channel,
-          scheduledFor
-        })
-      );
-    }
+    notifications.push(
+      await this.queueNotification({
+        pairingId,
+        recipientId: pairing.user2_id,
+        notificationType: 'reminder',
+        channel: 'both',
+        scheduledFor
+      })
+    );
 
     logger.info(`Queued ${notifications.length} reminder notifications for pairing ${pairingId} (${daysUntil} days before)`);
     return notifications;
@@ -114,8 +141,9 @@ class NotificationService {
 
   /**
    * Queue feedback request notifications
+   * Uses channel='both' to create a single notification entry per user
    */
-  async queueFeedbackNotifications(pairingId, channels = ['email', 'teams']) {
+  async queueFeedbackNotifications(pairingId) {
     const pairing = await Pairing.findByPk(pairingId);
     if (!pairing || !pairing.meeting_scheduled_at) {
       return [];
@@ -127,29 +155,26 @@ class NotificationService {
 
     const notifications = [];
 
-    for (const channel of channels) {
-      // Queue for user1
-      notifications.push(
-        await this.queueNotification({
-          pairingId,
-          recipientId: pairing.user1_id,
-          notificationType: 'feedback',
-          channel,
-          scheduledFor
-        })
-      );
+    // Queue single notification per user with channel='both'
+    notifications.push(
+      await this.queueNotification({
+        pairingId,
+        recipientId: pairing.user1_id,
+        notificationType: 'feedback_request',
+        channel: 'both',
+        scheduledFor
+      })
+    );
 
-      // Queue for user2
-      notifications.push(
-        await this.queueNotification({
-          pairingId,
-          recipientId: pairing.user2_id,
-          notificationType: 'feedback',
-          channel,
-          scheduledFor
-        })
-      );
-    }
+    notifications.push(
+      await this.queueNotification({
+        pairingId,
+        recipientId: pairing.user2_id,
+        notificationType: 'feedback_request',
+        channel: 'both',
+        scheduledFor
+      })
+    );
 
     logger.info(`Queued ${notifications.length} feedback notifications for pairing ${pairingId}`);
     return notifications;
@@ -242,13 +267,27 @@ class NotificationService {
       const partner = isUser1 ? pairing.user2 : pairing.user1;
       const icebreakers = pairing.icebreakers || [];
 
-      let result;
+      let result = {};
 
       // Send based on channel and type
       if (channel === 'email') {
-        result = await this.sendEmailNotification(notification_type, pairing, user, partner, icebreakers);
+        result.email = await this.sendEmailNotification(notification_type, pairing, user, partner, icebreakers);
       } else if (channel === 'teams') {
-        result = await this.sendTeamsNotification(notification_type, pairing, user, partner, icebreakers);
+        result.teams = await this.sendTeamsNotification(notification_type, pairing, user, partner, icebreakers);
+      } else if (channel === 'both') {
+        // Send to both email and Teams
+        const [emailResult, teamsResult] = await Promise.allSettled([
+          this.sendEmailNotification(notification_type, pairing, user, partner, icebreakers),
+          this.sendTeamsNotification(notification_type, pairing, user, partner, icebreakers)
+        ]);
+
+        result.email = emailResult.status === 'fulfilled' ? emailResult.value : { error: emailResult.reason?.message };
+        result.teams = teamsResult.status === 'fulfilled' ? teamsResult.value : { error: teamsResult.reason?.message };
+
+        // If both failed, throw an error
+        if (emailResult.status === 'rejected' && teamsResult.status === 'rejected') {
+          throw new Error(`Both channels failed: Email: ${emailResult.reason?.message}, Teams: ${teamsResult.reason?.message}`);
+        }
       } else {
         throw new Error(`Unknown notification channel: ${channel}`);
       }
@@ -340,6 +379,121 @@ class NotificationService {
 
       default:
         throw new Error(`Unknown notification type: ${type}`);
+    }
+  }
+
+  /**
+   * Queue a notification to the partner when meeting is confirmed
+   * This notifies them that their partner has confirmed and asks for feedback
+   */
+  async notifyPartnerMeetingConfirmed(pairingId, confirmerUserId) {
+    try {
+      const pairing = await Pairing.findByPk(pairingId);
+      if (!pairing) {
+        throw new Error('Pairing not found');
+      }
+
+      // Determine who the partner is
+      const partnerId = pairing.user1_id === confirmerUserId
+        ? pairing.user2_id
+        : pairing.user1_id;
+
+      // Queue a feedback_request notification for the partner
+      const notification = await this.queueNotification({
+        pairingId,
+        recipientId: partnerId,
+        notificationType: 'feedback_request',
+        channel: 'both'
+      });
+
+      logger.info(`Queued meeting confirmed notification for partner ${partnerId} on pairing ${pairingId}`);
+
+      return notification;
+    } catch (error) {
+      logger.error('Error notifying partner of meeting confirmation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send reminder notifications for pending pairings in a round
+   * Creates 'reminder' notifications for pairings that haven't been completed yet
+   */
+  async sendRemindersForPendingPairings(roundId = null) {
+    try {
+      const { Op } = require('sequelize');
+
+      // Build query for pending/confirmed pairings (not completed or cancelled)
+      const where = {
+        status: {
+          [Op.in]: ['pending', 'confirmed']
+        }
+      };
+
+      // If roundId specified, filter by that round
+      if (roundId) {
+        where.matching_round_id = roundId;
+      }
+
+      const pairings = await Pairing.findAll({
+        where,
+        include: [
+          {
+            association: 'user1',
+            include: [{ association: 'department' }]
+          },
+          {
+            association: 'user2',
+            include: [{ association: 'department' }]
+          },
+          {
+            association: 'icebreakers',
+            attributes: ['id', 'topic', 'category'],
+            through: { attributes: [] }
+          }
+        ]
+      });
+
+      if (pairings.length === 0) {
+        logger.info('No pending pairings found for reminders');
+        return { sent: 0, pairings: 0 };
+      }
+
+      logger.info(`Sending reminders for ${pairings.length} pending pairings`);
+
+      const notifications = [];
+
+      for (const pairing of pairings) {
+        // Queue reminder for user1
+        notifications.push(
+          await this.queueNotification({
+            pairingId: pairing.id,
+            recipientId: pairing.user1_id,
+            notificationType: 'reminder',
+            channel: 'both'
+          })
+        );
+
+        // Queue reminder for user2
+        notifications.push(
+          await this.queueNotification({
+            pairingId: pairing.id,
+            recipientId: pairing.user2_id,
+            notificationType: 'reminder',
+            channel: 'both'
+          })
+        );
+      }
+
+      logger.info(`Queued ${notifications.length} reminder notifications for ${pairings.length} pairings`);
+
+      return {
+        sent: notifications.length,
+        pairings: pairings.length
+      };
+    } catch (error) {
+      logger.error('Error sending reminders for pending pairings:', error);
+      throw error;
     }
   }
 

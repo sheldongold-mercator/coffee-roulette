@@ -54,6 +54,7 @@ export const analyticsAPI = {
   getDepartmentStats: () => api.get('/admin/analytics/departments'),
   getFeedbackStats: () => api.get('/admin/analytics/feedback'),
   getCrossDepartmentStats: () => api.get('/admin/analytics/cross-department'),
+  getCrossSeniorityStats: () => api.get('/admin/analytics/cross-seniority'),
   getEngagementLeaderboard: (limit = 10) =>
     api.get(`/admin/analytics/leaderboard?limit=${limit}`),
   getRecentActivity: (limit = 20) =>
@@ -100,6 +101,9 @@ export const matchingAPI = {
   // Manual matching with filters
   runManualMatching: (data) => api.post('/admin/matching/run-manual', data),
   previewWithFilters: (data) => api.post('/admin/matching/preview-filtered', data),
+  // Reminder notifications
+  sendRoundReminders: (roundId) => api.post(`/admin/matching/rounds/${roundId}/send-reminders`),
+  sendAllReminders: () => api.post('/admin/matching/send-all-reminders'),
 };
 
 // Settings APIs

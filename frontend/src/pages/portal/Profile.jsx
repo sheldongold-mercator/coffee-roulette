@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import {
@@ -8,6 +8,8 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ArrowPathIcon,
+  CalendarIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { portalAPI } from '../../services/portalAPI';
 import toast from 'react-hot-toast';
@@ -42,6 +44,40 @@ const Profile = () => {
       toast.error(error.response?.data?.message || 'Failed to opt out');
     },
   });
+
+  // State for temporary opt-out date
+  const [availableFromDate, setAvailableFromDate] = useState('');
+
+  // Initialize date from profile
+  useEffect(() => {
+    if (profile?.availableFrom) {
+      setAvailableFromDate(profile.availableFrom.split('T')[0]);
+    } else {
+      setAvailableFromDate('');
+    }
+  }, [profile?.availableFrom]);
+
+  // Set availability mutation
+  const setAvailabilityMutation = useMutation(
+    (date) => portalAPI.setAvailability(date),
+    {
+      onSuccess: (_, date) => {
+        if (date) {
+          toast.success('Temporary break scheduled!');
+        } else {
+          toast.success('Welcome back! You are now available for matching.');
+        }
+        queryClient.invalidateQueries('profile');
+        queryClient.invalidateQueries('currentPairing');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'Failed to set availability');
+      },
+    }
+  );
+
+  // Check if user has a future available_from date
+  const isTempOptedOut = profile?.availableFrom && new Date(profile.availableFrom) > new Date();
 
   // Loading skeleton
   if (isLoading) {
@@ -132,19 +168,35 @@ const Profile = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             {profile?.isOptedIn ? (
-              <>
-                <div className="flex items-center justify-center w-14 h-14 bg-green-100 rounded-xl">
-                  <CheckCircleIcon className="w-7 h-7 text-green-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-green-700 text-lg">
-                    You're In!
-                  </p>
-                  <p className="text-gray-500">
-                    You'll be matched in upcoming rounds
-                  </p>
-                </div>
-              </>
+              isTempOptedOut ? (
+                <>
+                  <div className="flex items-center justify-center w-14 h-14 bg-amber-100 rounded-xl">
+                    <ClockIcon className="w-7 h-7 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-700 text-lg">
+                      Taking a Break
+                    </p>
+                    <p className="text-gray-500">
+                      You'll return on {new Date(profile.availableFrom).toLocaleDateString()}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-center w-14 h-14 bg-green-100 rounded-xl">
+                    <CheckCircleIcon className="w-7 h-7 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-700 text-lg">
+                      You're In!
+                    </p>
+                    <p className="text-gray-500">
+                      You'll be matched in upcoming rounds
+                    </p>
+                  </div>
+                </>
+              )
             ) : (
               <>
                 <div className="flex items-center justify-center w-14 h-14 bg-gray-100 rounded-xl">
@@ -163,20 +215,37 @@ const Profile = () => {
           </div>
 
           {profile?.isOptedIn ? (
-            <button
-              onClick={() => optOutMutation.mutate()}
-              disabled={optOutMutation.isLoading}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
-            >
-              {optOutMutation.isLoading ? (
-                <>
-                  <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Opt Out'
-              )}
-            </button>
+            isTempOptedOut ? (
+              <button
+                onClick={() => setAvailabilityMutation.mutate(null)}
+                disabled={setAvailabilityMutation.isLoading}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl shadow-lg shadow-amber-200 hover:shadow-xl hover:shadow-amber-300 transition-all disabled:opacity-50"
+              >
+                {setAvailabilityMutation.isLoading ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Come Back Early'
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => optOutMutation.mutate()}
+                disabled={optOutMutation.isLoading}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                {optOutMutation.isLoading ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  'Opt Out'
+                )}
+              </button>
+            )
           ) : (
             <button
               onClick={() => optInMutation.mutate()}
@@ -198,6 +267,79 @@ const Profile = () => {
           )}
         </div>
       </motion.div>
+
+      {/* Temporary Break Section - only show for opted-in users */}
+      {profile?.isOptedIn && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-2xl shadow-sm border border-amber-100 p-8"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-xl">
+              <CalendarIcon className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Schedule a Break
+              </h3>
+              <p className="text-sm text-gray-500">
+                Going on holiday or need some time off? Set a date when you'll be back.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+            <div className="flex-1 w-full sm:w-auto">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Available from
+              </label>
+              <input
+                type="date"
+                value={availableFromDate}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setAvailableFromDate(e.target.value)}
+                className="w-full sm:w-auto px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                You won't be matched until this date
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              {availableFromDate && (
+                <button
+                  onClick={() => {
+                    setAvailableFromDate('');
+                    if (profile?.availableFrom) {
+                      setAvailabilityMutation.mutate(null);
+                    }
+                  }}
+                  disabled={setAvailabilityMutation.isLoading}
+                  className="px-4 py-2.5 text-gray-600 font-medium rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                onClick={() => setAvailabilityMutation.mutate(availableFromDate)}
+                disabled={!availableFromDate || setAvailabilityMutation.isLoading || availableFromDate === profile?.availableFrom?.split('T')[0]}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 text-white font-medium rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {setAvailabilityMutation.isLoading ? (
+                  <>
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Set Break'
+                )}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
     </div>
   );

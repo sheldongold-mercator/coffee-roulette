@@ -11,6 +11,7 @@ export const portalAPI = {
   // Opt-in/out
   optIn: () => api.post('/users/opt-in'),
   optOut: () => api.post('/users/opt-out'),
+  setAvailability: (availableFrom) => api.post('/users/availability', { availableFrom }),
 
   // Pairings
   getCurrentPairing: () => api.get('/users/pairings/current'),

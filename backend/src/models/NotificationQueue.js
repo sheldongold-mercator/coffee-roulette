@@ -25,7 +25,7 @@ module.exports = (sequelize) => {
       }
     },
     notification_type: {
-      type: DataTypes.ENUM('pairing', 'reminder', 'feedback_request', 'admin_alert'),
+      type: DataTypes.ENUM('welcome', 'pairing', 'reminder', 'feedback_request', 'admin_alert'),
       allowNull: false
     },
     channel: {

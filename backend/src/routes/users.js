@@ -35,6 +35,13 @@ router.post('/opt-in', userController.optIn);
 router.post('/opt-out', userController.optOut);
 
 /**
+ * @route   POST /api/users/availability
+ * @desc    Set availability date (temporary opt-out)
+ * @access  Private
+ */
+router.post('/availability', userController.setAvailability);
+
+/**
  * @route   GET /api/users/pairings
  * @desc    Get user's pairing history
  * @access  Private

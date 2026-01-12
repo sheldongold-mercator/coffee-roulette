@@ -104,6 +104,8 @@ const Departments = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('departments');
+        // Also invalidate users query so Users page refreshes with new participation statuses
+        queryClient.invalidateQueries('users');
         toast.success('Department updated successfully!');
       },
       onError: () => {

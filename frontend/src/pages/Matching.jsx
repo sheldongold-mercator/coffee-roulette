@@ -7,6 +7,7 @@ import {
   CheckCircleIcon,
   UsersIcon,
   AdjustmentsHorizontalIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import { matchingAPI } from '../services/api';
 import { format } from 'date-fns';
@@ -28,6 +29,10 @@ const Matching = () => {
     matchingAPI.getEligibleCount()
   );
 
+  const { data: scheduleData } = useQuery(['matching-schedule'], () =>
+    matchingAPI.getSchedule()
+  );
+
   const { data: previewData, isLoading: previewLoading } = useQuery(
     ['matching-preview', 'v2'],
     () => matchingAPI.previewMatching(),
@@ -45,6 +50,10 @@ const Matching = () => {
   const eligibleCount = eligibleData?.data?.data?.count || eligibleData?.data?.count || 0;
   const previewInfo = previewData?.data?.preview || previewData?.preview || null;
   const previewPairings = previewData?.data?.pairings || previewData?.pairings || [];
+  const scheduleConfig = scheduleData?.data?.data || scheduleData?.data || {};
+  const nextRunDate = scheduleConfig.enabled && scheduleConfig.nextRunDate
+    ? new Date(scheduleConfig.nextRunDate)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -79,7 +88,7 @@ const Matching = () => {
       </motion.div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -130,6 +139,27 @@ const Matching = () => {
                 {rounds.length > 0
                   ? format(new Date(rounds[0].createdAt), 'MMM d, yyyy')
                   : 'N/A'}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="card"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 bg-sky-50 rounded-lg">
+              <CalendarDaysIcon className="w-5 h-5 text-sky-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Next Round</p>
+              <p className="text-lg font-bold text-gray-900">
+                {nextRunDate
+                  ? format(nextRunDate, 'MMM d, yyyy')
+                  : 'Schedule not set'}
               </p>
             </div>
           </div>
@@ -207,7 +237,7 @@ const Matching = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.5 }}
         className="card overflow-hidden p-0"
       >
         <div className="px-6 py-4 border-b border-gray-200">

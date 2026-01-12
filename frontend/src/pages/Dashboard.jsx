@@ -117,8 +117,8 @@ const Dashboard = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Total Users"
-          value={stats.users?.total || stats.totalUsers || 0}
+          title="Eligible Users"
+          value={stats.users?.eligible || stats.eligibleUsers || 0}
           icon={UsersIcon}
           loading={overviewLoading}
         />

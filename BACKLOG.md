@@ -11,90 +11,40 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 
 ## High Priority
 
-### 1. Department Enable Confirmation Modal
-- [x] **Type:** Enhancement
-- **Description:** When an admin enables a department, show a confirmation modal explaining what will happen (all users will be sent welcome emails, auto-opted in, etc.)
-- **Location:** `frontend/src/pages/Departments.jsx`
-- **Completed:** Modal shows user count, explains emails, opt-in, grace period, and opt-out option
-
 ### 2. Log Communications in User Details
-- [ ] **Type:** Bug
+- [~] **Type:** Bug
 - **Description:** When emails are sent to users (welcome, matching, etc.), there is no log visible in their View Details page. Add a communications history tab/section.
 - **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/controllers/`
-
-### 3. "Count Me In" Bypasses Grace Period
-- [ ] **Type:** Enhancement
-- **Description:** When a user visits the Portal from an email link and clicks "Count Me In", the 48-hour grace period should be overwritten so they can participate in the next matching round immediately.
-- **Location:** `frontend/src/pages/portal/`, `backend/src/controllers/userController.js`
-
-### 4. Remove Separate Profile Nav Item
-- [x] **Type:** Enhancement
-- **Description:** Remove the separate "Profile" navigation item in the Portal. Instead, users should access their profile by clicking their name in the top right corner.
-- **Location:** `frontend/src/` (portal layout/navigation)
-- **Completed:** Removed Profile from nav array, made user name/avatar in header clickable to navigate to profile
+- **Issues Found:**
+  - Welcome emails are not appearing in the Comms tab (see `.screenshots/Screenshot 2026-01-12 at 21.33.44.png`)
+  - Pairing notifications still appear twice (once for Email, once for Teams) despite item #20 claiming this was fixed
 
 ### 5. Auto Opt-In on Department Enable
-- [ ] **Type:** Bug/Enhancement
+- [~] **Type:** Bug/Enhancement
 - **Description:** When departments are enabled and welcome emails are sent, all users in that department should be automatically opted in and enter the grace period. Verify this is working correctly.
 - **Location:** `backend/src/controllers/adminDepartmentController.js`, `backend/src/services/`
-
-### 6. Close Modal on Save Changes
-- [x] **Type:** Bug
-- **Description:** When a user clicks "Save Changes" on the User Details modal in admin, the modal should automatically close.
-- **Location:** `frontend/src/components/users/UserDetailModal.jsx`
-- **Completed:** Added `onClose()` to updateMutation onSuccess callback
-
-### 7. Reorder Matching Tab in User Details
-- [x] **Type:** Enhancement
-- **Description:** The "Opted into matching" checkbox in the User Details modal should be at the top of the Admin Overrides section on the Matching tab.
-- **Location:** `frontend/src/components/users/UserDetailModal.jsx`
-- **Completed:** Moved "Opted into Matching" checkbox to the top of Admin Overrides section in Matching tab with descriptive helper text
-
-### 16. Participation Status Logic for Opted-In Users
-- [ ] **Type:** Bug
-- **Description:** On the Users page, the Participation status should show "Opted-In" for users that have opted-in manually, passed their Grace Period, or had their Grace Period skipped. Currently may not reflect all these cases correctly.
-- **Location:** `frontend/src/pages/Users.jsx`, `backend/src/controllers/adminUserController.js`
-
-### 17. Participation Status for Unassigned Departments
-- [ ] **Type:** Bug
-- **Description:** On the Users page, users whose departments are N/A (unassigned) should show "Dept Excluded" as their Participation status instead of other statuses.
-- **Location:** `frontend/src/pages/Users.jsx`
-
-### 18. Update Participation Filter Options
-- [ ] **Type:** Enhancement
-- **Description:** The Participation filter on the Users page should include all possible Participation tag options. Add "Dept Excluded" and remove "Opted in (Dept Excluded)" which doesn't make sense. Ensure filter options match actual status tags.
-- **Location:** `frontend/src/pages/Users.jsx`
-
-### 19. Temporary Opt-Out with Available From Date
-- [ ] **Type:** Feature
-- **Description:** Users should be able to temporarily opt out by setting an "Available from" date in their Portal Profile. When set to a future date, their Participation status should show "Temp Opted Out" instead of "Opted Out". Status returns to previous state when date is reached. This should also be editable in the Admin User Details modal. Add "Temp Opted Out" to the Participation filter.
-- **Location:** `frontend/src/pages/portal/Profile.jsx`, `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/controllers/userController.js`
+- **Issues Found:**
+  - Users are opted-in and receive emails, but welcome emails don't appear in the Comms tab
+  - Related to issue #2 - welcome email logging not working correctly
 
 ### 20. Duplicate Pairing Notifications in Comms Tab
-- [ ] **Type:** Bug
+- [~] **Type:** Bug
 - **Description:** In the Comms tab of the User Details screen, Pairing Notification emails appear twice, whereas the department added/welcome email only appears once. Investigate and fix duplicate entries.
 - **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/` (notification logging)
+- **Issues Found:**
+  - Pairing notifications still appear as duplicates (one Email, one Teams entry) in the Comms tab
+  - The `channel='both'` fix may not be working as intended, or old data still shows separate entries
+  - See `.screenshots/Screenshot 2026-01-12 at 21.33.44.png` for evidence
 
 ### 21. Welcome Email for Users Synced to Active Department
-- [ ] **Type:** Enhancement
+- [x] **Type:** Enhancement
 - **Description:** When a new user is synced from Microsoft and their department is already active, they should immediately receive the Welcome Email and be auto-opted-in (with grace period). Currently this may only happen when a department is first enabled.
 - **Location:** `backend/src/jobs/dailyUserSync.js`, `backend/src/services/`
+- **Completed:** Already implemented in adminUserController.syncUsers - new users in active departments are auto-opted-in with opted_in_at set and receive welcome emails immediately. Grace period applies (skip_grace_period defaults to false).
 
 ---
 
 ## Medium Priority
-
-### 8. Allow Today's Date in Schedule
-- [x] **Type:** Bug
-- **Description:** In the Matching Schedule screen, users cannot select today's date. The validation should allow today's date as long as the time is later than the current time.
-- **Location:** `frontend/src/components/matching/ScheduleConfig.jsx`
-- **Completed:** Added improved validation that allows today's date when time is in future, with helpful error messages
-
-### 9. Fix Email Button Colors
-- [x] **Type:** Bug
-- **Description:** In both the department welcome email and matching email, the main CTA button has blue background with blue text, making it hard to read. Change text to white.
-- **Location:** `backend/src/templates/emails/`
-- **Completed:** Added inline styles with `color: #ffffff !important` to all CTA buttons in all 4 email templates (welcome, pairing_notification, feedback_request, meeting_reminder)
 
 ### 10. Fix Send Email Link in Portal
 - [x] **Type:** Bug
@@ -103,64 +53,132 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Completed:** Added proper URL encoding with encodeURIComponent and a pre-filled email body with personalized greeting
 
 ### 11. Reminder Notifications for Pending Pairings
-- [ ] **Type:** Enhancement
+- [x] **Type:** Enhancement
 - **Description:** In the View Details modal from Matching history, add ability to trigger reminder notifications for pending pairings. This should also happen automatically every week until the next matching round. Notifications should direct users to the portal to confirm meeting and leave feedback.
 - **Location:** `backend/src/jobs/`, `frontend/src/components/matching/MatchingRoundModal.jsx`
+- **Completed:** Added "Send Reminders" button in MatchingRoundModal for manual triggering, created weekly cron job (Mondays 9AM) that automatically sends reminders for all pending pairings, added sendRemindersForPendingPairings method to notificationService
 
 ### 12. Notify Partner When Meeting Confirmed
-- [ ] **Type:** Enhancement
+- [x] **Type:** Enhancement
 - **Description:** When one person in a pairing clicks "We Had Our Coffee", the other person should be notified and given a link to provide their own feedback.
 - **Location:** `backend/src/controllers/userController.js`, `backend/src/services/notificationService.js`
-
-### 22. Remove Experience Level Self-Service for Users
-- [x] **Type:** Enhancement
-- **Description:** Non-admin users should not be able to set their own Experience Level (seniority) in the Portal. This should only be editable by admins in the User Details modal.
-- **Location:** `frontend/src/pages/portal/Profile.jsx`
-- **Completed:** Removed seniority level selection section from Profile page entirely
-
-### 23. Move "How Coffee Roulette Works" Section
-- [x] **Type:** Enhancement
-- **Description:** Remove the "How Coffee Roulette Works" section from the Profile page in the Portal. Add this information to the card on the Portal Home page instead.
-- **Location:** `frontend/src/pages/portal/Profile.jsx`, `frontend/src/pages/portal/PortalHome.jsx`
-- **Completed:** Removed from Profile, added to PortalHome shown for pending pairings
-
-### 24. Replace Total Users with Eligible Users on Dashboard
-- [ ] **Type:** Enhancement
-- **Description:** On the admin Dashboard page, replace the "Total Users" stat with "Eligible Users" (users who are opted-in, past grace period, and in active departments).
-- **Location:** `frontend/src/pages/Dashboard.jsx`, `backend/src/controllers/adminAnalyticsController.js`
+- **Completed:** Added notifyPartnerMeetingConfirmed method to notificationService that queues a feedback_request notification to the partner when meeting is confirmed. Updated confirmMeeting endpoint to call this method.
 
 ---
 
 ## Lower Priority
 
-### 13. View Feedback Details
-- [ ] **Type:** Enhancement
-- **Description:**
-  - In the Portal history page, add option to view details showing feedback from both parties
-  - In Admin Matching history View Details modal, show ratings and feedback provided by users
-- **Location:** `frontend/src/pages/portal/PairingHistory.jsx`, `frontend/src/components/matching/MatchingRoundModal.jsx`
+### 26. Users Page Not Refreshing After Department Activation
+- [x] **Type:** Bug
+- **Description:** When a Department is activated, the Users screen does not automatically update to show the new Participation status for users in that department. Currently requires a manual page refresh. Should use React Query invalidation to refresh user data after department enable.
+- **Location:** `frontend/src/pages/Departments.jsx`, `frontend/src/pages/Users.jsx`
+- **Completed:** Added `queryClient.invalidateQueries('users')` to toggleMutation onSuccess in Departments.jsx to refresh Users page when department status changes
 
-### 14. Verify Engagement Leaderboard
-- [ ] **Type:** Bug/Verification
-- **Description:** In the analytics dashboard, the Engagement Leaderboard shows "1 Pairings". Verify this is calculating correctly - may be correct after only one pairing, but needs verification.
-- **Location:** `backend/src/controllers/adminAnalyticsController.js`, `frontend/src/pages/Dashboard.jsx`
+### 30. Update Schedule Dates After Match Runs
+- [~] **Type:** Bug
+- **Description:** After a scheduled matching round runs, the next run date/time should automatically update to the next occurrence based on the schedule frequency (weekly, bi-weekly, monthly). Currently the dates may not be advancing correctly after a match completes.
+- **Location:** `backend/src/jobs/`, `backend/src/services/scheduleService.js`
+- **Issues Found:**
+  - Date changes incorrectly (jumping to Feb 1, 2026 at 2:00 PM regardless of schedule settings)
+  - Related to item #31 - scheduled matches don't actually run
 
-### 15. Add Cross-Seniority Connections Panel
-- [ ] **Type:** Enhancement
-- **Description:** In the analytics dashboard, there is a panel for cross-department connections. Add a similar panel for cross-seniority connections.
-- **Location:** `backend/src/controllers/adminAnalyticsController.js`, `frontend/src/pages/Dashboard.jsx`
-
-### 25. Rename Seniority Level Labels
-- [x] **Type:** Enhancement
-- **Description:** In the User Details modal Seniority Level dropdown, rename "Junior" to "Apprentice" and "Mid-Level" to "Practitioner". Update both frontend labels and backend enum values if needed.
-- **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/models/User.js`
-- **Completed:** Updated labels in UserDetailModal and ManualMatchingModal (backend values unchanged as they're DB enum values)
+### 31. Scheduled Matches Not Running (CRITICAL)
+- [~] **Type:** Bug (Critical)
+- **Description:** The automatic matching scheduled via the Matching Schedule does not appear to actually execute matches. Investigate the cron job, verify it's being triggered at the scheduled time, and ensure it calls the matching service correctly. Use ULTRATHINK for thorough investigation.
+- **Location:** `backend/src/jobs/`, `backend/src/services/scheduleService.js`, `backend/src/services/matchingService.js`
+- **Issues Found:**
+  - Scheduled matches still don't actually execute at the scheduled time
+  - Nothing appears in Matching History when schedule triggers
+  - Participants aren't matched by scheduled runs
+  - Previous fix may not have fully resolved the issue
 
 ---
 
 ## Completed
 
-_Items will be moved here when completed._
+### 1. Department Enable Confirmation Modal
+- [x] **Type:** Enhancement
+- **Completed:** Modal shows user count, explains emails, opt-in, grace period, and opt-out option
+
+### 4. Remove Separate Profile Nav Item
+- [x] **Type:** Enhancement
+- **Completed:** Removed Profile from nav array, made user name/avatar in header clickable to navigate to profile
+
+### 6. Close Modal on Save Changes
+- [x] **Type:** Bug
+- **Completed:** Added `onClose()` to updateMutation onSuccess callback
+
+### 8. Allow Today's Date in Schedule
+- [x] **Type:** Bug
+- **Completed:** Added improved validation that allows today's date when time is in future, with helpful error messages
+
+### 9. Fix Email Button Colors
+- [x] **Type:** Bug
+- **Completed:** Added inline styles with `color: #ffffff !important` to all CTA buttons in all 4 email templates
+
+### 17. Participation Status for Unassigned Departments
+- [x] **Type:** Bug
+- **Completed:** Added frontend logic to override status to "Dept Excluded" when department is N/A
+
+### 18. Update Participation Filter Options
+- [x] **Type:** Enhancement
+- **Completed:** Updated filter options: added Opted In, Dept Excluded; removed Opted In (Dept Excluded)
+
+### 22. Remove Experience Level Self-Service for Users
+- [x] **Type:** Enhancement
+- **Completed:** Removed seniority level selection section from Profile page entirely
+
+### 25. Rename Seniority Level Labels
+- [x] **Type:** Enhancement
+- **Completed:** Updated labels in UserDetailModal and ManualMatchingModal (Apprentice, Practitioner)
+
+### 3. "Count Me In" Bypasses Grace Period
+- [x] **Type:** Enhancement
+- **Completed:** optIn endpoint sets skip_grace_period=true so users can participate immediately (verified via code)
+
+### 7. Reorder Matching Tab in User Details
+- [x] **Type:** Enhancement
+- **Completed:** "Opted Into Matching" checkbox moved to top of Admin Overrides section
+
+### 16. Participation Status Logic for Opted-In Users
+- [x] **Type:** Bug
+- **Completed:** Users ready for matching show 'Opted In' instead of 'Eligible'
+
+### 19. Temporary Opt-Out with Available From Date
+- [x] **Type:** Feature
+- **Completed:** Portal Profile has "Schedule a Break" section; status shows "Temp Opted Out" when future date set
+
+### 23. Move "How Coffee Roulette Works" Section
+- [x] **Type:** Enhancement
+- **Completed:** HowItWorks component in EmptyState.jsx shows on Portal Home; Profile page does not have section (verified via code)
+
+### 24. Replace Total Users with Eligible Users on Dashboard
+- [x] **Type:** Enhancement
+- **Completed:** Dashboard shows "Eligible Users" stat instead of "Total Users"
+
+### 13. View Feedback Details
+- [x] **Type:** Enhancement
+- **Completed:** Star ratings and feedback visible in Portal history and Admin Matching modal
+
+### 14. Verify Engagement Leaderboard
+- [x] **Type:** Bug/Verification
+- **Completed:** Leaderboard shows individual users with name, department, and pairing count
+
+### 15. Add Cross-Seniority Connections Panel
+- [x] **Type:** Enhancement
+- **Completed:** Analytics page has cross-seniority connections panel with pairing stats
+
+### 27. Participation Status Details in User Details Modal
+- [x] **Type:** Enhancement
+- **Completed:** Status card with badge and dates displayed prominently in User Details modal
+
+### 28. Add "Next Round" Block to Matching Page
+- [x] **Type:** Enhancement
+- **Completed:** 4th stat card shows "Next Round" date or "Schedule not set"
+
+### 29. Matching Schedule Save Button
+- [x] **Type:** Enhancement
+- **Completed:** Save/Discard buttons and unsaved changes indicator added to ScheduleConfig
 
 ---
 

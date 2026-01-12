@@ -8,10 +8,15 @@ class AnalyticsService {
    */
   async getOverviewStats() {
     try {
+      // Calculate grace period cutoff (48 hours ago)
+      const gracePeriodCutoff = new Date();
+      gracePeriodCutoff.setHours(gracePeriodCutoff.getHours() - 48);
+
       const [
         totalUsers,
         activeUsers,
         optedInUsers,
+        eligibleUsers,
         totalDepartments,
         activeDepartments,
         totalRounds,
@@ -22,6 +27,22 @@ class AnalyticsService {
         User.count(),
         User.count({ where: { is_active: true } }),
         User.count({ where: { is_active: true, is_opted_in: true } }),
+        // Eligible users: active, opted-in, past grace period, in active department
+        User.count({
+          where: {
+            is_active: true,
+            is_opted_in: true,
+            [Op.or]: [
+              { skip_grace_period: true },
+              { opted_in_at: { [Op.lte]: gracePeriodCutoff } }
+            ]
+          },
+          include: [{
+            association: 'department',
+            where: { is_active: true },
+            required: true
+          }]
+        }),
         Department.count(),
         Department.count({ where: { is_active: true } }),
         MatchingRound.count({ where: { status: 'completed' } }),
@@ -47,6 +68,7 @@ class AnalyticsService {
           total: totalUsers,
           active: activeUsers,
           optedIn: optedInUsers,
+          eligible: eligibleUsers,
           participationRate
         },
         departments: {
@@ -281,40 +303,88 @@ class AnalyticsService {
   }
 
   /**
-   * Get engagement leaderboard (most active departments)
+   * Get cross-seniority pairing statistics
    */
-  async getEngagementLeaderboard(limit = 10) {
+  async getCrossSeniorityStats() {
     try {
-      const departments = await Department.findAll({
+      const pairings = await Pairing.findAll({
         include: [
           {
-            association: 'users',
-            attributes: ['id', 'is_opted_in'],
-            include: [
-              {
-                association: 'feedback',
-                attributes: ['id']
-              }
-            ]
+            association: 'user1',
+            attributes: ['seniority_level']
+          },
+          {
+            association: 'user2',
+            attributes: ['seniority_level']
           }
         ]
       });
 
-      const leaderboard = departments.map(dept => {
-        const optedInUsers = dept.users.filter(u => u.is_opted_in).length;
-        const totalFeedback = dept.users.reduce((sum, user) => sum + user.feedback.length, 0);
+      const totalPairings = pairings.length;
+      const crossSeniorityPairings = pairings.filter(p =>
+        p.user1?.seniority_level && p.user2?.seniority_level &&
+        p.user1.seniority_level !== p.user2.seniority_level
+      ).length;
 
-        return {
-          departmentId: dept.id,
-          departmentName: dept.name,
-          optedInUsers,
-          totalFeedback,
-          engagementScore: optedInUsers + totalFeedback // Simple engagement score
-        };
-      })
-      .filter(d => d.engagementScore > 0)
-      .sort((a, b) => b.engagementScore - a.engagementScore)
-      .slice(0, limit);
+      const crossSeniorityRate = totalPairings > 0
+        ? Math.round((crossSeniorityPairings / totalPairings) * 100)
+        : 0;
+
+      return {
+        totalPairings,
+        crossSeniorityPairings,
+        sameSeniorityPairings: totalPairings - crossSeniorityPairings,
+        crossSeniorityRate
+      };
+    } catch (error) {
+      logger.error('Error getting cross-seniority stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get engagement leaderboard (most active users by pairing count)
+   */
+  async getEngagementLeaderboard(limit = 10) {
+    try {
+      // Get all users with their pairing counts
+      const users = await User.findAll({
+        where: { is_active: true },
+        attributes: ['id', 'first_name', 'last_name'],
+        include: [
+          {
+            association: 'department',
+            attributes: ['name']
+          }
+        ]
+      });
+
+      // Count pairings for each user
+      const userPairings = await Promise.all(
+        users.map(async (user) => {
+          const pairingCount = await Pairing.count({
+            where: {
+              [Op.or]: [
+                { user1_id: user.id },
+                { user2_id: user.id }
+              ]
+            }
+          });
+
+          return {
+            id: user.id,
+            name: `${user.first_name} ${user.last_name}`,
+            department: user.department?.name || 'No department',
+            totalPairings: pairingCount
+          };
+        })
+      );
+
+      // Sort by pairings and return top users
+      const leaderboard = userPairings
+        .filter(u => u.totalPairings > 0)
+        .sort((a, b) => b.totalPairings - a.totalPairings)
+        .slice(0, limit);
 
       return leaderboard;
     } catch (error) {
