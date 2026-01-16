@@ -1,4 +1,5 @@
-const { MatchingRound, Pairing, SystemSetting, MeetingFeedback } = require('../models');
+const { MatchingRound, Pairing, User, SystemSetting, MeetingFeedback, sequelize } = require('../models');
+const { Op } = require('sequelize');
 const matchingService = require('../services/matchingService');
 const notificationService = require('../services/notificationService');
 const scheduleService = require('../services/scheduleService');
@@ -8,17 +9,94 @@ const logger = require('../utils/logger');
 
 /**
  * Get all matching rounds
+ * Supports filtering by status, date range, and participant search
  */
 const getMatchingRounds = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status, dateFrom, dateTo, search } = req.query;
 
     const where = {};
     if (status) {
       where.status = status;
     }
 
+    // Date range filter
+    if (dateFrom || dateTo) {
+      where.scheduled_date = {};
+      if (dateFrom) {
+        where.scheduled_date[Op.gte] = new Date(dateFrom);
+      }
+      if (dateTo) {
+        // Add one day to include the entire end date
+        const endDate = new Date(dateTo);
+        endDate.setDate(endDate.getDate() + 1);
+        where.scheduled_date[Op.lt] = endDate;
+      }
+    }
+
     const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+
+    // If searching by participant, need a different query approach
+    let roundIds = null;
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim().toLowerCase()}%`;
+
+      // Find round IDs that have matching participants
+      const matchingPairings = await Pairing.findAll({
+        attributes: ['matching_round_id'],
+        include: [
+          {
+            association: 'user1',
+            attributes: [],
+            where: {
+              [Op.or]: [
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('user1.first_name')), 'LIKE', searchTerm),
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('user1.last_name')), 'LIKE', searchTerm),
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('user1.email')), 'LIKE', searchTerm)
+              ]
+            },
+            required: false
+          },
+          {
+            association: 'user2',
+            attributes: [],
+            where: {
+              [Op.or]: [
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('user2.first_name')), 'LIKE', searchTerm),
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('user2.last_name')), 'LIKE', searchTerm),
+                sequelize.where(sequelize.fn('LOWER', sequelize.col('user2.email')), 'LIKE', searchTerm)
+              ]
+            },
+            required: false
+          }
+        ],
+        where: {
+          [Op.or]: [
+            { '$user1.id$': { [Op.ne]: null } },
+            { '$user2.id$': { [Op.ne]: null } }
+          ]
+        },
+        group: ['matching_round_id'],
+        raw: true
+      });
+
+      roundIds = matchingPairings.map(p => p.matching_round_id);
+
+      // If no matching rounds found with the search term, return empty
+      if (roundIds.length === 0) {
+        return res.json({
+          data: [],
+          pagination: {
+            total: 0,
+            page: parseInt(page, 10),
+            limit: parseInt(limit, 10),
+            totalPages: 0
+          }
+        });
+      }
+
+      where.id = { [Op.in]: roundIds };
+    }
 
     const rounds = await MatchingRound.findAndCountAll({
       where,

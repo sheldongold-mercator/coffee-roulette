@@ -1,4 +1,4 @@
-const { NotificationQueue, Pairing, User } = require('../models');
+const { NotificationQueue, Pairing, User, AdminUser } = require('../models');
 const { Op } = require('sequelize');
 const emailService = require('./emailService');
 const teamsService = require('./teamsService');
@@ -513,6 +513,81 @@ class NotificationService {
       failed,
       total: pending + sent + failed
     };
+  }
+
+  /**
+   * Notify admin users when a matching round completes
+   * Sends email to all admin users with round summary
+   */
+  async notifyAdminsMatchingComplete(roundResult) {
+    try {
+      // Get all admin users with their user details
+      const adminUsers = await AdminUser.findAll({
+        include: [{
+          association: 'user',
+          attributes: ['id', 'email', 'first_name', 'last_name']
+        }]
+      });
+
+      if (adminUsers.length === 0) {
+        logger.info('No admin users to notify about matching completion');
+        return { sent: 0, total: 0 };
+      }
+
+      logger.info(`Notifying ${adminUsers.length} admin users about matching completion`);
+
+      // Load admin notification template
+      const adminTemplate = require('../templates/emails/admin_matching_complete');
+      const results = [];
+
+      for (const admin of adminUsers) {
+        if (!admin.user || !admin.user.email) {
+          logger.warn(`Admin user ${admin.id} has no associated user/email`);
+          continue;
+        }
+
+        try {
+          const templateData = {
+            adminName: admin.user.first_name || 'Admin',
+            roundName: roundResult.round.name,
+            roundId: roundResult.round.id,
+            scheduledDate: roundResult.round.executedAt || roundResult.round.scheduledDate,
+            totalParticipants: roundResult.round.totalParticipants,
+            totalPairings: roundResult.round.totalPairings,
+            unpairedUser: roundResult.unpaired || null,
+            source: roundResult.round.source || 'scheduled'
+          };
+
+          const { subject, html, text } = adminTemplate(templateData);
+
+          await emailService.sendEmail({
+            to: admin.user.email,
+            subject,
+            htmlBody: html,
+            textBody: text
+          });
+
+          results.push({ success: true, email: admin.user.email });
+          logger.info(`Admin notification sent to ${admin.user.email}`);
+        } catch (error) {
+          results.push({ success: false, email: admin.user.email, error: error.message });
+          logger.error(`Failed to notify admin ${admin.user.email}:`, error);
+        }
+      }
+
+      const successful = results.filter(r => r.success).length;
+      logger.info(`Admin matching notifications: ${successful}/${adminUsers.length} sent successfully`);
+
+      return {
+        sent: successful,
+        total: adminUsers.length,
+        results
+      };
+    } catch (error) {
+      logger.error('Error notifying admins about matching completion:', error);
+      // Don't throw - admin notifications shouldn't block the main flow
+      return { sent: 0, total: 0, error: error.message };
+    }
   }
 }
 

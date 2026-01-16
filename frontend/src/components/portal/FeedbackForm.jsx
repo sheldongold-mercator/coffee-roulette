@@ -55,34 +55,34 @@ const FeedbackForm = ({ pairingId, partnerName, existingFeedback, onClose, onSuc
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-xl sm:rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto mx-2 sm:mx-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
+        <div className="p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">
                 {isEditing ? 'Update Feedback' : 'How was it?'}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-xs sm:text-sm text-gray-500">
                 {isEditing ? 'Update your experience with' : 'Share your experience with'} {partnerName}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex-shrink-0 p-1.5 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             {/* Star Rating */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">
                 Overall Experience
               </label>
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-1 sm:gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
@@ -90,17 +90,17 @@ const FeedbackForm = ({ pairingId, partnerName, existingFeedback, onClose, onSuc
                     onClick={() => setRating(star)}
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
-                    className="p-1 transition-transform hover:scale-110"
+                    className="p-1.5 sm:p-1 transition-transform hover:scale-110 active:scale-95"
                   >
                     {(hoverRating || rating) >= star ? (
-                      <StarIconSolid className="w-10 h-10 text-amber-400" />
+                      <StarIconSolid className="w-9 h-9 sm:w-10 sm:h-10 text-amber-400" />
                     ) : (
-                      <StarIcon className="w-10 h-10 text-gray-300" />
+                      <StarIcon className="w-9 h-9 sm:w-10 sm:h-10 text-gray-300" />
                     )}
                   </button>
                 ))}
               </div>
-              <p className="text-center text-sm text-gray-500 mt-2">
+              <p className="text-center text-xs sm:text-sm text-gray-500 mt-2">
                 {rating === 0 && 'Tap to rate'}
                 {rating === 1 && 'Not great'}
                 {rating === 2 && 'Could be better'}
@@ -112,7 +112,7 @@ const FeedbackForm = ({ pairingId, partnerName, existingFeedback, onClose, onSuc
 
             {/* Topics Discussed */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                 What did you talk about?
               </label>
               <input
@@ -120,13 +120,13 @@ const FeedbackForm = ({ pairingId, partnerName, existingFeedback, onClose, onSuc
                 value={topicsDiscussed}
                 onChange={(e) => setTopicsDiscussed(e.target.value)}
                 placeholder="e.g., Work projects, hobbies, travel..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
               />
             </div>
 
             {/* Comments */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                 Any other thoughts? (optional)
               </label>
               <textarea
@@ -134,7 +134,7 @@ const FeedbackForm = ({ pairingId, partnerName, existingFeedback, onClose, onSuc
                 onChange={(e) => setComments(e.target.value)}
                 placeholder="Share what made this coffee chat memorable..."
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all resize-none"
               />
             </div>
 
@@ -142,11 +142,11 @@ const FeedbackForm = ({ pairingId, partnerName, existingFeedback, onClose, onSuc
             <button
               type="submit"
               disabled={submitMutation.isLoading || rating === 0}
-              className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-amber-200 hover:shadow-xl hover:shadow-amber-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 sm:py-4 text-sm sm:text-base bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg shadow-amber-200 hover:shadow-xl hover:shadow-amber-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitMutation.isLoading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   {isEditing ? 'Updating...' : 'Submitting...'}
                 </span>
               ) : (

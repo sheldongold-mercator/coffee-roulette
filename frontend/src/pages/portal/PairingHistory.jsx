@@ -96,10 +96,10 @@ const PairingHistory = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
           Your Coffee Journey
         </h1>
-        <p className="text-gray-600 text-lg">
+        <p className="text-gray-600 text-base sm:text-lg">
           {pairings.length > 0
             ? `You've had ${pairings.filter((p) => p.status === 'completed').length} coffee chats so far`
             : 'Your coffee history will appear here'}
@@ -114,29 +114,29 @@ const PairingHistory = () => {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4"
         >
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 border border-amber-100">
-            <div className="text-3xl font-bold text-amber-600">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-amber-100">
+            <div className="text-2xl sm:text-3xl font-bold text-amber-600">
               {pairings.length}
             </div>
-            <div className="text-sm text-gray-600">Total Matches</div>
+            <div className="text-xs sm:text-sm text-gray-600">Total Matches</div>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 border border-green-100">
-            <div className="text-3xl font-bold text-green-600">
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-green-100">
+            <div className="text-2xl sm:text-3xl font-bold text-green-600">
               {pairings.filter((p) => p.status === 'completed').length}
             </div>
-            <div className="text-sm text-gray-600">Completed</div>
+            <div className="text-xs sm:text-sm text-gray-600">Completed</div>
           </div>
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-4 border border-blue-100">
-            <div className="text-3xl font-bold text-blue-600">
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-blue-100">
+            <div className="text-2xl sm:text-3xl font-bold text-blue-600">
               {new Set(pairings.map((p) => p.partner?.id)).size}
             </div>
-            <div className="text-sm text-gray-600">Colleagues Met</div>
+            <div className="text-xs sm:text-sm text-gray-600">Colleagues Met</div>
           </div>
-          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 border border-purple-100">
-            <div className="text-3xl font-bold text-purple-600">
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-purple-100">
+            <div className="text-2xl sm:text-3xl font-bold text-purple-600">
               {totalRounds}
             </div>
-            <div className="text-sm text-gray-600">Rounds</div>
+            <div className="text-xs sm:text-sm text-gray-600">Rounds</div>
           </div>
         </motion.div>
       )}
@@ -175,37 +175,37 @@ const PairingHistory = () => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-6 border border-amber-100 hover:shadow-lg hover:shadow-amber-100/50 transition-all group"
+                className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-amber-100 hover:shadow-lg hover:shadow-amber-100/50 transition-all group"
               >
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3 sm:gap-4">
                   {/* Partner Avatar */}
-                  <div className="flex-shrink-0 flex items-center justify-center w-14 h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl text-white text-lg font-bold shadow-md group-hover:shadow-lg transition-shadow">
-                    {initials || <UserIcon className="w-6 h-6" />}
+                  <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl text-white text-base sm:text-lg font-bold shadow-md group-hover:shadow-lg transition-shadow">
+                    {initials || <UserIcon className="w-5 h-5 sm:w-6 sm:h-6" />}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-base sm:text-lg truncate">
                           {pairing.partner?.firstName} {pairing.partner?.lastName}
                         </h3>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-xs sm:text-sm text-gray-500">
                           {pairing.partner?.role && (
                             <span className="capitalize">{pairing.partner.role}</span>
                           )}
                         </p>
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${status.color}`}
+                        className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap ${status.color}`}
                       >
-                        <StatusIcon className="w-4 h-4" />
+                        <StatusIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         {status.label}
                       </span>
                     </div>
 
                     {/* Meta info */}
-                    <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                    <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
                       {pairing.round?.name && (
                         <span className="flex items-center gap-1">
                           <CalendarIcon className="w-4 h-4" />

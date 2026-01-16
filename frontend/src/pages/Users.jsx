@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
-import { useQuery } from 'react-query';
-import { motion } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
   ArrowDownTrayIcon,
+  CheckIcon,
+  XMarkIcon,
+  EnvelopeIcon,
+  CalendarIcon,
+  UserPlusIcon,
+  UserMinusIcon,
 } from '@heroicons/react/24/outline';
 import { userAPI, analyticsAPI, departmentAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import UserDetailModal from '../components/users/UserDetailModal';
 
 const Users = () => {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
     department: '',
@@ -19,6 +26,9 @@ const Users = () => {
   });
   const [page, setPage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [selectedUserIds, setSelectedUserIds] = useState(new Set());
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [availableFromDate, setAvailableFromDate] = useState('');
   const limit = 20;
 
   const { data: usersData, isLoading, refetch } = useQuery(
@@ -70,6 +80,62 @@ const Users = () => {
       toast.dismiss();
       toast.error('Failed to export users');
     }
+  };
+
+  // Bulk action mutation
+  const bulkMutation = useMutation(
+    ({ userIds, action, data }) => userAPI.bulkAction(userIds, action, data),
+    {
+      onSuccess: (response) => {
+        const { results } = response.data;
+        if (results.failed === 0) {
+          toast.success(`${results.success} users updated successfully`);
+        } else {
+          toast.success(`${results.success} updated, ${results.failed} failed`);
+        }
+        setSelectedUserIds(new Set());
+        queryClient.invalidateQueries('users');
+      },
+      onError: () => {
+        toast.error('Failed to perform bulk action');
+      },
+    }
+  );
+
+  // Selection helpers
+  const toggleSelectAll = () => {
+    if (selectedUserIds.size === users.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(users.map(u => u.id)));
+    }
+  };
+
+  const toggleSelectUser = (userId) => {
+    const newSelected = new Set(selectedUserIds);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUserIds(newSelected);
+  };
+
+  const handleBulkAction = (action, data = {}) => {
+    const userIds = Array.from(selectedUserIds);
+    if (userIds.length === 0) return;
+
+    bulkMutation.mutate({ userIds, action, data });
+  };
+
+  const handleSetAvailableFrom = () => {
+    if (!availableFromDate) {
+      handleBulkAction('set_available_from', { availableFrom: null });
+    } else {
+      handleBulkAction('set_available_from', { availableFrom: availableFromDate });
+    }
+    setShowDateModal(false);
+    setAvailableFromDate('');
   };
 
   // Handle both old and new API formats
@@ -171,6 +237,66 @@ const Users = () => {
         </div>
       </motion.div>
 
+      {/* Bulk Action Bar */}
+      <AnimatePresence>
+        {selectedUserIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="card bg-primary-50 border-primary-200"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="font-medium text-primary-700">
+                  {selectedUserIds.size} user{selectedUserIds.size !== 1 ? 's' : ''} selected
+                </span>
+                <button
+                  onClick={() => setSelectedUserIds(new Set())}
+                  className="text-sm text-primary-600 hover:text-primary-800"
+                >
+                  Clear selection
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => handleBulkAction('opt_in', { skipGracePeriod: true })}
+                  disabled={bulkMutation.isLoading}
+                  className="btn btn-sm bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
+                >
+                  <UserPlusIcon className="w-4 h-4" />
+                  Opt In
+                </button>
+                <button
+                  onClick={() => handleBulkAction('opt_out')}
+                  disabled={bulkMutation.isLoading}
+                  className="btn btn-sm bg-gray-500 text-white hover:bg-gray-600 disabled:opacity-50"
+                >
+                  <UserMinusIcon className="w-4 h-4" />
+                  Opt Out
+                </button>
+                <button
+                  onClick={() => handleBulkAction('send_welcome_email')}
+                  disabled={bulkMutation.isLoading}
+                  className="btn btn-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+                >
+                  <EnvelopeIcon className="w-4 h-4" />
+                  Send Welcome Email
+                </button>
+                <button
+                  onClick={() => setShowDateModal(true)}
+                  disabled={bulkMutation.isLoading}
+                  className="btn btn-sm bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                  Set Available From
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Users Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -182,6 +308,14 @@ const Users = () => {
           <table className="table">
             <thead>
               <tr>
+                <th className="w-10">
+                  <input
+                    type="checkbox"
+                    checked={users.length > 0 && selectedUserIds.size === users.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                </th>
                 <th>Name</th>
                 <th>Email</th>
                 <th>Department</th>
@@ -195,20 +329,28 @@ const Users = () => {
               {isLoading ? (
                 [...Array(10)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <div className="h-10 bg-gray-200 animate-shimmer rounded"></div>
                     </td>
                   </tr>
                 ))
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     No users found
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id}>
+                  <tr key={user.id} className={selectedUserIds.has(user.id) ? 'bg-primary-50' : ''}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.has(user.id)}
+                        onChange={() => toggleSelectUser(user.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                    </td>
                     <td className="font-medium text-gray-900">
                       {user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown'}
                     </td>
@@ -229,7 +371,7 @@ const Users = () => {
                     </td>
                     <td>
                       {(() => {
-                        // Check if department is N/A (unassigned)
+                        // Check if department is N/A (unassigned) or inactive
                         const hasDepartment = user.department?.name || user.department;
                         const deptIsActive = user.department?.isActive !== false;
 
@@ -238,8 +380,11 @@ const Users = () => {
                         let label = '';
                         let badgeClass = '';
 
-                        // Override status for unassigned department
+                        // Override status for unassigned or inactive department
                         if (!hasDepartment || hasDepartment === 'N/A') {
+                          status = 'dept_excluded';
+                        } else if (!deptIsActive && !user.overrideDepartmentExclusion) {
+                          // Department exists but is inactive (and no override)
                           status = 'dept_excluded';
                         }
 
@@ -330,6 +475,84 @@ const Users = () => {
           onClose={() => setSelectedUserId(null)}
         />
       )}
+
+      {/* Set Available From Modal */}
+      <AnimatePresence>
+        {showDateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            onClick={() => setShowDateModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Set Available From Date
+                </h3>
+                <button
+                  onClick={() => setShowDateModal(false)}
+                  className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Set a future date when {selectedUserIds.size} selected user{selectedUserIds.size !== 1 ? 's' : ''} will become available for matching again. Leave empty to clear the date.
+              </p>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Available from
+                </label>
+                <input
+                  type="date"
+                  value={availableFromDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setAvailableFromDate(e.target.value)}
+                  className="input w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Users won't be matched until this date
+                </p>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    setShowDateModal(false);
+                    setAvailableFromDate('');
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSetAvailableFrom}
+                  disabled={bulkMutation.isLoading}
+                  className="btn btn-primary"
+                >
+                  {bulkMutation.isLoading ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : availableFromDate ? (
+                    'Set Date'
+                  ) : (
+                    'Clear Date'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

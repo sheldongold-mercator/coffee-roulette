@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const matchingService = require('../services/matchingService');
+const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 
 /**
@@ -24,6 +25,13 @@ async function executeMonthlyMatching() {
       totalPairings: result.round.totalPairings,
       totalParticipants: result.round.totalParticipants
     });
+
+    // Notify admin users about the completed matching round
+    try {
+      await notificationService.notifyAdminsMatchingComplete(result);
+    } catch (adminNotifyError) {
+      logger.error('Failed to notify admins (non-fatal):', adminNotifyError);
+    }
 
     return result;
   } catch (error) {

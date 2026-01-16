@@ -12,16 +12,12 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 ## High Priority
 
 ### 2. Log Communications in User Details
-- [x] **Type:** Bug
+- [~] **Type:** Bug
 - **Description:** When emails are sent to users (welcome, matching, etc.), there is no log visible in their View Details page. Add a communications history tab/section.
 - **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/controllers/`
-- **Completed:** Welcome email logging is implemented in department enable and user sync flows. Users who opt-in through the portal don't receive welcome emails (by design - they already know about the program). The Comms tab correctly displays notifications with channel='both' for new data.
-
-### 5. Auto Opt-In on Department Enable
-- [x] **Type:** Bug/Enhancement
-- **Description:** When departments are enabled and welcome emails are sent, all users in that department should be automatically opted in and enter the grace period. Verify this is working correctly.
-- **Location:** `backend/src/controllers/adminDepartmentController.js`, `backend/src/services/`
-- **Completed:** Department enable flow correctly auto-opts-in users, sends welcome emails, and logs them to notification history. Related to #2 - logging is working correctly.
+- **Issues Found:**
+  - Welcome emails are not appearing in the Comms tab at all
+  - Need to verify logWelcomeEmail is being called and data is being saved to notification_queue table
 
 ### 20. Duplicate Pairing Notifications in Comms Tab
 - [x] **Type:** Bug
@@ -57,6 +53,50 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Location:** `backend/src/controllers/userController.js`, `backend/src/services/notificationService.js`
 - **Completed:** Added notifyPartnerMeetingConfirmed method to notificationService that queues a feedback_request notification to the partner when meeting is confirmed. Updated confirmMeeting endpoint to call this method.
 
+### 33. Department-Level Analytics Breakdown
+- [x] **Type:** Feature
+- **Description:** Add department-level analytics to the Analytics page showing metrics broken down by department: participation rates, meeting completion rates, average feedback scores, and cross-department connection counts per department.
+- **Location:** `frontend/src/pages/Analytics.jsx`, `backend/src/services/analyticsService.js`, `backend/src/controllers/adminAnalyticsController.js`
+- **Completed:** Added getDepartmentBreakdown method to analyticsService that computes per-department: participation rate, completion rate, cross-dept connections, avg feedback rating. Created new API endpoint /departments/breakdown. Added Department Analytics Breakdown table to Analytics page with color-coded badges for participation and completion rates.
+
+### 34. User Satisfaction Trends Over Time
+- [x] **Type:** Feature
+- **Description:** Add a time-series chart to the Analytics page showing user satisfaction trends over time based on meeting feedback ratings. Include options to filter by time period (last 3 months, 6 months, year).
+- **Location:** `frontend/src/pages/Analytics.jsx`, `backend/src/services/analyticsService.js`, `backend/src/controllers/adminAnalyticsController.js`
+- **Completed:** Added getSatisfactionTrends method to analyticsService that aggregates feedback ratings by month. Created new API endpoint /trends/satisfaction with months parameter. Added User Satisfaction Trends line chart to Analytics page with time period selector (3/6/12 months) showing average rating and response count over time.
+
+### 35. Bulk User Management
+- [x] **Type:** Feature
+- **Description:** Add ability to select multiple users on the Users page and perform batch actions: bulk opt-in, bulk opt-out, bulk send welcome email, bulk set available from date. Include select all/none and filter-aware selection.
+- **Location:** `frontend/src/pages/Users.jsx`, `backend/src/controllers/adminUserController.js`
+- **Completed:** Added comprehensive bulk user management:
+  - Backend: New `/api/admin/users/bulk` endpoint supporting opt_in, opt_out, send_welcome_email, and set_available_from actions
+  - Frontend: Checkbox selection column in users table with select all/none
+  - Bulk action bar appears when users selected with 4 actions: Opt In (skips grace period), Opt Out, Send Welcome Email, Set Available From
+  - Date picker modal for setting availability dates with option to clear
+  - Selected rows are highlighted, shows count of selected users
+
+### 38. Matching Exclusion Rules
+- [ ] **Type:** Feature
+- **Description:** Allow admins to define exclusion rules preventing certain users from being paired together (e.g., manager/direct report, users who had conflicts). Add UI in User Details modal to manage exclusions and enforce in matching algorithm.
+- **Location:** `backend/src/services/matchingService.js`, `backend/src/models/`, `frontend/src/components/users/UserDetailModal.jsx`
+
+### 39. Icebreaker Questions in Pairing Notifications
+- [x] **Type:** Enhancement
+- **Description:** Include a random icebreaker question in the pairing notification emails and Teams messages to give participants a conversation starter for their coffee meeting.
+- **Location:** `backend/src/templates/`, `backend/src/services/notificationService.js`
+- **Completed:** Already implemented - matchingService.assignIcebreakers() assigns 3 random icebreakers to each pairing, which are then included in both email templates (pairing_notification, meeting_reminder) and Teams adaptive cards.
+
+### 41. Auto-Schedule Meeting from Calendar Availability
+- [ ] **Type:** Feature
+- **Description:** When a pairing is created, use Microsoft Graph API to find the next mutually available calendar slot for both participants and automatically create a calendar event with meeting details and icebreaker suggestion.
+- **Location:** `backend/src/services/`, `backend/src/config/graphClient.js`
+
+### 42. Preview and Edit Templates Before Sending
+- [ ] **Type:** Feature
+- **Description:** Before admin actions that trigger notifications (department activation, matching round initiation, bulk welcome emails, etc.), show which email/Teams template will be used with a preview. Provide a link or inline option to edit the template before confirming the action. This gives admins visibility into what users will receive and the opportunity to customize messaging before sending.
+- **Location:** `frontend/src/pages/Departments.jsx`, `frontend/src/pages/Matching.jsx`, `frontend/src/components/matching/ManualMatchingModal.jsx`, `frontend/src/components/templates/`
+
 ---
 
 ## Lower Priority
@@ -78,6 +118,30 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Description:** The automatic matching scheduled via the Matching Schedule does not appear to actually execute matches. Investigate the cron job, verify it's being triggered at the scheduled time, and ensure it calls the matching service correctly. Use ULTRATHINK for thorough investigation.
 - **Location:** `backend/src/jobs/`, `backend/src/services/scheduleService.js`, `backend/src/services/matchingService.js`
 - **Completed:** Fixed two issues: (1) calculateCronFromSchedule now converts UTC times to target timezone before extracting cron components, (2) getScheduleConfig now uses stored cron expression instead of presets. Verified scheduled job executed successfully and created matching round 8.
+
+### 36. Admin Notification When Scheduled Match Runs
+- [x] **Type:** Enhancement
+- **Description:** Send an email or Teams notification to admin users when a scheduled matching round executes, including summary of pairings created, any users who couldn't be matched, and link to view the round details.
+- **Location:** `backend/src/jobs/`, `backend/src/services/notificationService.js`
+- **Completed:** Added notifyAdminsMatchingComplete method to notificationService that sends email to all admin users with round summary (round name, participants, pairings, unpaired user if any). Created admin_matching_complete.js email template. Updated monthlyMatching job to call the notification method after successful matching.
+
+### 37. Pairing History Search/Filter
+- [x] **Type:** Enhancement
+- **Description:** Add search and filter capabilities to the Matching History on the Matching page. Allow filtering by date range, status (completed/pending), and searching by participant name.
+- **Location:** `frontend/src/pages/Matching.jsx`, `backend/src/controllers/adminMatchingController.js`
+- **Completed:** Added backend support for dateFrom, dateTo, and search query params in getMatchingRounds. Frontend Matching.jsx now has a collapsible filter panel with search by participant name, status filter, and date range filters. Filter badge shows count of active filters.
+
+### 40. Mobile-Responsive Portal Improvements
+- [x] **Type:** Enhancement
+- **Description:** Improve the mobile responsiveness of the user portal pages (PortalHome, Profile, PairingHistory). Ensure cards, buttons, and forms are properly sized and usable on mobile devices.
+- **Location:** `frontend/src/pages/portal/`, `frontend/src/components/portal/`
+- **Completed:** Added comprehensive responsive improvements across all portal pages and components:
+  - PortalHome: Responsive text sizes, hidden decorative blob on mobile, stacking meeting banner elements
+  - PairingHistory: Responsive stat cards, improved timeline card layout with stacking status badges
+  - Profile: Responsive profile card, status section, and schedule break form
+  - PartnerCard: Stacking email/Teams buttons on mobile, responsive avatar sizing, text truncation
+  - FeedbackForm: Improved modal sizing, larger touch targets for star ratings
+  - EmptyState: Responsive sizing for all elements
 
 ---
 
@@ -172,6 +236,10 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 ### 29. Matching Schedule Save Button
 - [x] **Type:** Enhancement
 - **Completed:** Save/Discard buttons and unsaved changes indicator added to ScheduleConfig
+
+### 5. Auto Opt-In on Department Enable
+- [x] **Type:** Bug/Enhancement
+- **Completed:** Department enable auto-opts-in users with Grace Period status
 
 ---
 

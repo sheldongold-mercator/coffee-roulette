@@ -115,8 +115,8 @@ const PortalHome = () => {
         animate={{ opacity: 1, y: 0 }}
         className="relative"
       >
-        {/* Decorative background blob */}
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br from-amber-200/30 to-orange-200/30 rounded-full blur-3xl pointer-events-none" />
+        {/* Decorative background blob - hidden on mobile to prevent overflow */}
+        <div className="hidden sm:block absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-br from-amber-200/30 to-orange-200/30 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative">
           <motion.div
@@ -131,12 +131,12 @@ const PortalHome = () => {
             {isCompleted && 'Coffee chat completed'}
           </motion.div>
 
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
             {isPending && 'Time for Coffee!'}
             {isConfirmed && 'Your Coffee Date'}
             {isCompleted && 'Hope it went well!'}
           </h1>
-          <p className="text-gray-600 text-lg">
+          <p className="text-gray-600 text-base sm:text-lg">
             {isPending && `Reach out to ${pairing.partner?.firstName} and schedule your chat`}
             {isConfirmed && `Don't forget your meeting with ${pairing.partner?.firstName}`}
             {isCompleted && `Share how your coffee with ${pairing.partner?.firstName} went`}
@@ -150,23 +150,25 @@ const PortalHome = () => {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl"
+          className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl"
         >
-          <div className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-green-100 rounded-xl">
-            <CalendarDaysIcon className="w-6 h-6 text-green-600" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-green-800">Scheduled for</p>
-            <p className="text-lg font-semibold text-green-900">
-              {formatMeetingDate(pairing.meetingScheduledAt)}
-            </p>
+          <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+            <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-xl">
+              <CalendarDaysIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-green-800">Scheduled for</p>
+              <p className="text-base sm:text-lg font-semibold text-green-900 truncate">
+                {formatMeetingDate(pairing.meetingScheduledAt)}
+              </p>
+            </div>
           </div>
           {!isCompleted && (
             <a
               href={`https://outlook.office.com/calendar`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 bg-white text-green-700 font-medium rounded-xl border border-green-200 hover:bg-green-50 transition-colors"
+              className="w-full sm:w-auto text-center px-4 py-2 bg-white text-green-700 font-medium rounded-xl border border-green-200 hover:bg-green-50 transition-colors"
             >
               View Calendar
             </a>

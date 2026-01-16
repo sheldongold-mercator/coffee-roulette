@@ -594,6 +594,131 @@ const syncUsers = async (req, res) => {
 };
 
 /**
+ * Perform bulk actions on multiple users
+ */
+const bulkAction = async (req, res) => {
+  try {
+    const { userIds, action, data } = req.body;
+    const { v4: uuidv4 } = require('uuid');
+    const emailService = require('../services/emailService');
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: 'userIds must be a non-empty array'
+      });
+    }
+
+    const validActions = ['opt_in', 'opt_out', 'send_welcome_email', 'set_available_from'];
+    if (!validActions.includes(action)) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        message: `action must be one of: ${validActions.join(', ')}`
+      });
+    }
+
+    logger.info(`Admin ${req.user.id} initiated bulk action: ${action} for ${userIds.length} users`);
+
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: []
+    };
+
+    // Fetch all users with their departments
+    const users = await User.findAll({
+      where: { id: { [Op.in]: userIds } },
+      include: [{ association: 'department', attributes: ['id', 'name', 'is_active'] }]
+    });
+
+    for (const user of users) {
+      try {
+        switch (action) {
+          case 'opt_in':
+            await user.update({
+              is_opted_in: true,
+              opted_in_at: new Date(),
+              opted_out_at: null,
+              skip_grace_period: data?.skipGracePeriod || false
+            });
+            results.success++;
+            break;
+
+          case 'opt_out':
+            await user.update({
+              is_opted_in: false,
+              opted_out_at: new Date()
+            });
+            results.success++;
+            break;
+
+          case 'send_welcome_email':
+            try {
+              await emailService.sendWelcomeEmail(user, user.department?.name);
+              await user.update({ welcome_sent_at: new Date() });
+              await notificationService.logWelcomeEmail(user.id, 'sent');
+              results.success++;
+            } catch (emailError) {
+              await notificationService.logWelcomeEmail(user.id, 'failed', emailError.message);
+              throw emailError;
+            }
+            break;
+
+          case 'set_available_from':
+            if (!data?.availableFrom) {
+              // Clear available_from date
+              await user.update({ available_from: null });
+            } else {
+              const availDate = new Date(data.availableFrom);
+              if (isNaN(availDate.getTime())) {
+                throw new Error('Invalid date format');
+              }
+              await user.update({ available_from: availDate });
+            }
+            results.success++;
+            break;
+        }
+      } catch (userError) {
+        results.failed++;
+        results.errors.push({
+          userId: user.id,
+          email: user.email,
+          error: userError.message
+        });
+        logger.error(`Bulk action error for user ${user.id}:`, userError);
+      }
+    }
+
+    // Log any users that weren't found
+    const foundIds = users.map(u => u.id);
+    const notFoundIds = userIds.filter(id => !foundIds.includes(id));
+    if (notFoundIds.length > 0) {
+      notFoundIds.forEach(id => {
+        results.failed++;
+        results.errors.push({
+          userId: id,
+          error: 'User not found'
+        });
+      });
+    }
+
+    logger.info(`Bulk action ${action} completed: ${results.success} success, ${results.failed} failed`);
+
+    res.json({
+      success: true,
+      message: `Bulk ${action.replace('_', ' ')} completed`,
+      results
+    });
+  } catch (error) {
+    logger.error('Bulk action error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to perform bulk action'
+    });
+  }
+};
+
+/**
  * Get user statistics
  */
 const getUserStats = async (req, res) => {
@@ -653,5 +778,6 @@ module.exports = {
   getUserById,
   updateUser,
   syncUsers,
-  getUserStats
+  getUserStats,
+  bulkAction
 };

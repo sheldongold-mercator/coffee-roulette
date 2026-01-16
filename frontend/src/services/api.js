@@ -52,9 +52,12 @@ export const analyticsAPI = {
   getCompletionTrends: (months = 6) =>
     api.get(`/admin/analytics/trends/completion?months=${months}`),
   getDepartmentStats: () => api.get('/admin/analytics/departments'),
+  getDepartmentBreakdown: () => api.get('/admin/analytics/departments/breakdown'),
   getFeedbackStats: () => api.get('/admin/analytics/feedback'),
   getCrossDepartmentStats: () => api.get('/admin/analytics/cross-department'),
   getCrossSeniorityStats: () => api.get('/admin/analytics/cross-seniority'),
+  getSatisfactionTrends: (months = 6) =>
+    api.get(`/admin/analytics/trends/satisfaction?months=${months}`),
   getEngagementLeaderboard: (limit = 10) =>
     api.get(`/admin/analytics/leaderboard?limit=${limit}`),
   getRecentActivity: (limit = 20) =>
@@ -72,6 +75,7 @@ export const userAPI = {
   updateUser: (userId, data) => api.put(`/admin/users/${userId}`, data),
   syncUsers: () => api.post('/admin/users/sync'),
   getUserStats: () => api.get('/admin/users/stats'),
+  bulkAction: (userIds, action, data) => api.post('/admin/users/bulk', { userIds, action, data }),
 };
 
 // Department APIs

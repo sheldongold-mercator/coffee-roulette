@@ -30,6 +30,13 @@ router.get('/stats', adminUserController.getUserStats);
 router.post('/sync', adminUserController.syncUsers);
 
 /**
+ * @route   POST /api/admin/users/bulk
+ * @desc    Perform bulk actions on multiple users
+ * @access  Admin
+ */
+router.post('/bulk', adminUserController.bulkAction);
+
+/**
  * @route   GET /api/admin/users/:userId
  * @desc    Get specific user by ID
  * @access  Admin

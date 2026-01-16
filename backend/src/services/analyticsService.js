@@ -262,6 +262,89 @@ class AnalyticsService {
   }
 
   /**
+   * Get detailed department-level analytics breakdown
+   * Includes participation rate, completion rate, feedback score, cross-dept connections
+   */
+  async getDepartmentBreakdown() {
+    try {
+      const departments = await Department.findAll({
+        where: { is_active: true },
+        include: [
+          {
+            association: 'users',
+            attributes: ['id', 'is_active', 'is_opted_in']
+          }
+        ]
+      });
+
+      const breakdown = await Promise.all(departments.map(async (dept) => {
+        const userIds = dept.users.filter(u => u.is_active).map(u => u.id);
+        const activeUsers = userIds.length;
+        const optedInUsers = dept.users.filter(u => u.is_active && u.is_opted_in).length;
+
+        // Get pairings involving users from this department
+        const pairings = await Pairing.findAll({
+          where: {
+            [Op.or]: [
+              { user1_id: { [Op.in]: userIds } },
+              { user2_id: { [Op.in]: userIds } }
+            ]
+          },
+          include: [
+            { association: 'user1', attributes: ['id', 'department_id'] },
+            { association: 'user2', attributes: ['id', 'department_id'] },
+            { association: 'feedback', attributes: ['rating'] }
+          ]
+        });
+
+        const totalPairings = pairings.length;
+        const completedPairings = pairings.filter(p => p.status === 'completed').length;
+        const completionRate = totalPairings > 0 ? Math.round((completedPairings / totalPairings) * 100) : 0;
+
+        // Cross-department connections
+        const crossDeptPairings = pairings.filter(p =>
+          (userIds.includes(p.user1_id) && p.user2?.department_id !== dept.id) ||
+          (userIds.includes(p.user2_id) && p.user1?.department_id !== dept.id)
+        ).length;
+
+        // Average feedback rating for this department's users
+        const allFeedback = [];
+        for (const pairing of pairings) {
+          if (pairing.feedback && pairing.feedback.length > 0) {
+            for (const fb of pairing.feedback) {
+              allFeedback.push(fb.rating);
+            }
+          }
+        }
+        const avgRating = allFeedback.length > 0
+          ? (allFeedback.reduce((a, b) => a + b, 0) / allFeedback.length).toFixed(1)
+          : null;
+
+        return {
+          departmentId: dept.id,
+          departmentName: dept.name,
+          activeUsers,
+          optedInUsers,
+          participationRate: activeUsers > 0 ? Math.round((optedInUsers / activeUsers) * 100) : 0,
+          totalPairings,
+          completedPairings,
+          completionRate,
+          crossDeptPairings,
+          crossDeptRate: totalPairings > 0 ? Math.round((crossDeptPairings / totalPairings) * 100) : 0,
+          avgFeedbackRating: avgRating,
+          feedbackCount: allFeedback.length
+        };
+      }));
+
+      // Sort by participation rate descending
+      return breakdown.sort((a, b) => b.participationRate - a.participationRate);
+    } catch (error) {
+      logger.error('Error getting department breakdown:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get cross-department pairing statistics
    */
   async getCrossDepartmentStats() {
@@ -338,6 +421,82 @@ class AnalyticsService {
       };
     } catch (error) {
       logger.error('Error getting cross-seniority stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user satisfaction trends over time
+   * Returns average feedback ratings aggregated by month
+   */
+  async getSatisfactionTrends(months = 6) {
+    try {
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - months);
+      startDate.setDate(1); // Start from first of month
+      startDate.setHours(0, 0, 0, 0);
+
+      // Get all feedback in the date range
+      const feedbacks = await MeetingFeedback.findAll({
+        where: {
+          created_at: {
+            [Op.gte]: startDate
+          }
+        },
+        attributes: ['rating', 'created_at'],
+        order: [['created_at', 'ASC']]
+      });
+
+      // Group by month
+      const monthlyData = {};
+      feedbacks.forEach(feedback => {
+        const date = new Date(feedback.created_at);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = {
+            month: monthKey,
+            ratings: [],
+            count: 0
+          };
+        }
+        monthlyData[monthKey].ratings.push(feedback.rating);
+        monthlyData[monthKey].count++;
+      });
+
+      // Calculate averages and format for chart
+      const trends = Object.values(monthlyData).map(data => ({
+        month: data.month,
+        monthLabel: new Date(data.month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        avgRating: parseFloat((data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length).toFixed(2)),
+        count: data.count,
+        positive: data.ratings.filter(r => r >= 4).length,
+        neutral: data.ratings.filter(r => r === 3).length,
+        negative: data.ratings.filter(r => r <= 2).length
+      }));
+
+      // Fill in missing months with null values
+      const allMonths = [];
+      const currentDate = new Date();
+      const tempDate = new Date(startDate);
+      while (tempDate <= currentDate) {
+        const monthKey = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}`;
+        const existing = trends.find(t => t.month === monthKey);
+        allMonths.push(existing || {
+          month: monthKey,
+          monthLabel: tempDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          avgRating: null,
+          count: 0,
+          positive: 0,
+          neutral: 0,
+          negative: 0
+        });
+        tempDate.setMonth(tempDate.getMonth() + 1);
+      }
+
+      return allMonths;
+    } catch (error) {
+      logger.error('Error getting satisfaction trends:', error);
       throw error;
     }
   }

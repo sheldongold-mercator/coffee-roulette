@@ -7,9 +7,11 @@ const {
   getParticipationTrends,
   getCompletionTrends,
   getDepartmentStats,
+  getDepartmentBreakdown,
   getFeedbackStats,
   getCrossDepartmentStats,
   getCrossSeniorityStats,
+  getSatisfactionTrends,
   getEngagementLeaderboard,
   getRecentActivity,
   exportUsers,
@@ -27,9 +29,11 @@ router.get('/overview', getOverview);
 router.get('/trends/participation', getParticipationTrends);
 router.get('/trends/completion', getCompletionTrends);
 router.get('/departments', getDepartmentStats);
+router.get('/departments/breakdown', getDepartmentBreakdown);
 router.get('/feedback', getFeedbackStats);
 router.get('/cross-department', getCrossDepartmentStats);
 router.get('/cross-seniority', getCrossSeniorityStats);
+router.get('/trends/satisfaction', getSatisfactionTrends);
 router.get('/leaderboard', getEngagementLeaderboard);
 router.get('/activity', getRecentActivity);
 

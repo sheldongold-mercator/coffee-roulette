@@ -98,6 +98,23 @@ const getDepartmentStats = async (req, res) => {
 };
 
 /**
+ * Get detailed department-level analytics breakdown
+ */
+const getDepartmentBreakdown = async (req, res) => {
+  try {
+    const data = await analyticsService.getDepartmentBreakdown();
+
+    res.json({ data });
+  } catch (error) {
+    logger.error('Get department breakdown error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch department breakdown'
+    });
+  }
+};
+
+/**
  * Get feedback statistics
  */
 const getFeedbackStats = async (req, res) => {
@@ -144,6 +161,25 @@ const getCrossSeniorityStats = async (req, res) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to fetch cross-seniority statistics'
+    });
+  }
+};
+
+/**
+ * Get user satisfaction trends over time
+ */
+const getSatisfactionTrends = async (req, res) => {
+  try {
+    const { months = 6 } = req.query;
+
+    const data = await analyticsService.getSatisfactionTrends(parseInt(months, 10));
+
+    res.json({ data });
+  } catch (error) {
+    logger.error('Get satisfaction trends error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch satisfaction trends'
     });
   }
 };
@@ -388,9 +424,11 @@ module.exports = {
   getParticipationTrends,
   getCompletionTrends,
   getDepartmentStats,
+  getDepartmentBreakdown,
   getFeedbackStats,
   getCrossDepartmentStats,
   getCrossSeniorityStats,
+  getSatisfactionTrends,
   getEngagementLeaderboard,
   getRecentActivity,
   exportUsers,

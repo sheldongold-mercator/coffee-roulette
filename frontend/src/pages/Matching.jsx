@@ -8,6 +8,9 @@ import {
   UsersIcon,
   AdjustmentsHorizontalIcon,
   CalendarDaysIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { matchingAPI } from '../services/api';
 import { format } from 'date-fns';
@@ -21,8 +24,27 @@ const Matching = () => {
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   const [showManualModal, setShowManualModal] = useState(false);
 
-  const { data: roundsData, isLoading } = useQuery(['matching-rounds', 'v2'], () =>
-    matchingAPI.getRounds({ limit: 10 })
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Build filter params
+  const filterParams = {
+    limit: 50,
+    ...(searchTerm && { search: searchTerm }),
+    ...(statusFilter && { status: statusFilter }),
+    ...(dateFrom && { dateFrom }),
+    ...(dateTo && { dateTo }),
+  };
+
+  const hasActiveFilters = searchTerm || statusFilter || dateFrom || dateTo;
+
+  const { data: roundsData, isLoading } = useQuery(
+    ['matching-rounds', 'v2', filterParams],
+    () => matchingAPI.getRounds(filterParams)
   );
 
   const { data: eligibleData } = useQuery(['matching-eligible', 'v2'], () =>
@@ -241,9 +263,109 @@ const Matching = () => {
         className="card overflow-hidden p-0"
       >
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Matching History
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Matching History
+            </h2>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`btn btn-sm ${hasActiveFilters ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              <FunnelIcon className="w-4 h-4" />
+              <span>Filters</span>
+              {hasActiveFilters && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-white text-primary-600 rounded-full">
+                  {[searchTerm, statusFilter, dateFrom, dateTo].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Filter Controls */}
+          {showFilters && (
+            <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Search */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Search Participant
+                  </label>
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Name or email..."
+                      className="input pl-9"
+                    />
+                  </div>
+                </div>
+
+                {/* Status Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="input"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="completed">Completed</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+
+                {/* Date From */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="input"
+                  />
+                </div>
+
+                {/* Date To */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setStatusFilter('');
+                      setDateFrom('');
+                      setDateTo('');
+                    }}
+                    className="btn btn-sm btn-secondary"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                    <span>Clear Filters</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="table">
