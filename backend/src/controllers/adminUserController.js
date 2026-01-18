@@ -73,6 +73,30 @@ const getUsers = async (req, res) => {
       offset
     });
 
+    // Get pairing counts for all users in the result
+    const userIds = users.rows.map(u => u.id);
+    const pairingCounts = await Pairing.findAll({
+      attributes: [
+        'user1_id',
+        'user2_id'
+      ],
+      where: {
+        [Op.or]: [
+          { user1_id: { [Op.in]: userIds } },
+          { user2_id: { [Op.in]: userIds } }
+        ]
+      },
+      raw: true
+    });
+
+    // Count pairings per user (user can be either user1 or user2)
+    const pairingCountMap = {};
+    userIds.forEach(id => { pairingCountMap[id] = 0; });
+    pairingCounts.forEach(p => {
+      if (pairingCountMap[p.user1_id] !== undefined) pairingCountMap[p.user1_id]++;
+      if (pairingCountMap[p.user2_id] !== undefined) pairingCountMap[p.user2_id]++;
+    });
+
     // Helper to compute participation status (matches matchingService logic)
     const getParticipationStatus = (user) => {
       if (!user.is_opted_in) return 'opted_out';
@@ -129,6 +153,7 @@ const getUsers = async (req, res) => {
           isVip: user.is_vip,
           isAdmin: !!user.adminRole,
           adminRole: user.adminRole ? user.adminRole.role : null,
+          totalPairings: pairingCountMap[user.id] || 0,
           lastSyncedAt: user.last_synced_at,
           createdAt: user.created_at
         };
@@ -244,16 +269,18 @@ const getUserById = async (req, res) => {
     });
 
     // Fetch notification history for this user
+    // Use required: false to ensure welcome emails (with null pairing_id) are included
     const notifications = await NotificationQueue.findAll({
       where: { recipient_user_id: userId },
       include: [
         {
           model: Pairing,
           as: 'pairing',
-          attributes: ['id'],
+          required: false,
+          attributes: ['id', 'user1_id', 'user2_id'],
           include: [
-            { model: User, as: 'user1', attributes: ['first_name', 'last_name'] },
-            { model: User, as: 'user2', attributes: ['first_name', 'last_name'] }
+            { model: User, as: 'user1', attributes: ['first_name', 'last_name'], required: false },
+            { model: User, as: 'user2', attributes: ['first_name', 'last_name'], required: false }
           ]
         }
       ],

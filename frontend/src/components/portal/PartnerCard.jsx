@@ -11,6 +11,22 @@ const PartnerCard = ({ partner }) => {
 
   const initials = `${partner.firstName?.charAt(0) || ''}${partner.lastName?.charAt(0) || ''}`;
 
+  // Build mailto URL for sending email to partner
+  const buildMailtoUrl = () => {
+    const subject = encodeURIComponent("Coffee Roulette - Let's meet!");
+    const body = encodeURIComponent(
+      `Hi ${partner.firstName},\n\nI was matched with you for this round of Coffee Roulette! Would you like to schedule a time for a coffee chat?\n\nLooking forward to meeting you!`
+    );
+    return `mailto:${partner.email}?subject=${subject}&body=${body}`;
+  };
+
+  const handleEmailClick = (e) => {
+    e.preventDefault();
+    const mailtoUrl = buildMailtoUrl();
+    // Use window.location for better cross-browser compatibility
+    window.location.href = mailtoUrl;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -56,13 +72,13 @@ const PartnerCard = ({ partner }) => {
         </div>
 
         <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <a
-            href={`mailto:${partner.email}?subject=${encodeURIComponent("Coffee Roulette - Let's meet!")}&body=${encodeURIComponent(`Hi ${partner.firstName},\n\nI was matched with you for this round of Coffee Roulette! Would you like to schedule a time for a coffee chat?\n\nLooking forward to meeting you!`)}`}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm sm:text-base font-medium rounded-xl hover:shadow-lg hover:shadow-amber-200 transition-all"
+          <button
+            onClick={handleEmailClick}
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm sm:text-base font-medium rounded-xl hover:shadow-lg hover:shadow-amber-200 transition-all cursor-pointer"
           >
             <EnvelopeIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             Send Email
-          </a>
+          </button>
           <a
             href={`https://teams.microsoft.com/l/chat/0/0?users=${partner.email}`}
             target="_blank"

@@ -65,7 +65,7 @@ class NotificationService {
 
   /**
    * Queue pairing notifications for both users
-   * Uses channel='both' to create a single notification entry that sends to both email and Teams
+   * Creates separate email and teams notification entries for better tracking visibility
    */
   async queuePairingNotifications(pairingId) {
     const pairing = await Pairing.findByPk(pairingId);
@@ -75,25 +75,29 @@ class NotificationService {
 
     const notifications = [];
 
-    // Queue single notification per user with channel='both'
-    // This creates one entry in Comms tab that sends to both email and Teams
-    notifications.push(
-      await this.queueNotification({
-        pairingId,
-        recipientId: pairing.user1_id,
-        notificationType: 'pairing',
-        channel: 'both'
-      })
-    );
+    // Queue separate email and teams notifications for each user
+    // This provides better visibility into which channel was used
+    for (const userId of [pairing.user1_id, pairing.user2_id]) {
+      // Email notification
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: userId,
+          notificationType: 'pairing',
+          channel: 'email'
+        })
+      );
 
-    notifications.push(
-      await this.queueNotification({
-        pairingId,
-        recipientId: pairing.user2_id,
-        notificationType: 'pairing',
-        channel: 'both'
-      })
-    );
+      // Teams notification
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: userId,
+          notificationType: 'pairing',
+          channel: 'teams'
+        })
+      );
+    }
 
     logger.info(`Queued ${notifications.length} pairing notifications for pairing ${pairingId}`);
     return notifications;
@@ -101,7 +105,7 @@ class NotificationService {
 
   /**
    * Queue reminder notifications
-   * Uses channel='both' to create a single notification entry per user
+   * Creates separate email and teams notification entries for better tracking visibility
    */
   async queueReminderNotifications(pairingId, daysUntil) {
     const pairing = await Pairing.findByPk(pairingId);
@@ -114,26 +118,30 @@ class NotificationService {
 
     const notifications = [];
 
-    // Queue single notification per user with channel='both'
-    notifications.push(
-      await this.queueNotification({
-        pairingId,
-        recipientId: pairing.user1_id,
-        notificationType: 'reminder',
-        channel: 'both',
-        scheduledFor
-      })
-    );
+    // Queue separate email and teams notifications for each user
+    for (const userId of [pairing.user1_id, pairing.user2_id]) {
+      // Email notification
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: userId,
+          notificationType: 'reminder',
+          channel: 'email',
+          scheduledFor
+        })
+      );
 
-    notifications.push(
-      await this.queueNotification({
-        pairingId,
-        recipientId: pairing.user2_id,
-        notificationType: 'reminder',
-        channel: 'both',
-        scheduledFor
-      })
-    );
+      // Teams notification
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: userId,
+          notificationType: 'reminder',
+          channel: 'teams',
+          scheduledFor
+        })
+      );
+    }
 
     logger.info(`Queued ${notifications.length} reminder notifications for pairing ${pairingId} (${daysUntil} days before)`);
     return notifications;
@@ -141,7 +149,7 @@ class NotificationService {
 
   /**
    * Queue feedback request notifications
-   * Uses channel='both' to create a single notification entry per user
+   * Creates separate email and teams notification entries for better tracking visibility
    */
   async queueFeedbackNotifications(pairingId) {
     const pairing = await Pairing.findByPk(pairingId);
@@ -155,26 +163,30 @@ class NotificationService {
 
     const notifications = [];
 
-    // Queue single notification per user with channel='both'
-    notifications.push(
-      await this.queueNotification({
-        pairingId,
-        recipientId: pairing.user1_id,
-        notificationType: 'feedback_request',
-        channel: 'both',
-        scheduledFor
-      })
-    );
+    // Queue separate email and teams notifications for each user
+    for (const userId of [pairing.user1_id, pairing.user2_id]) {
+      // Email notification
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: userId,
+          notificationType: 'feedback_request',
+          channel: 'email',
+          scheduledFor
+        })
+      );
 
-    notifications.push(
-      await this.queueNotification({
-        pairingId,
-        recipientId: pairing.user2_id,
-        notificationType: 'feedback_request',
-        channel: 'both',
-        scheduledFor
-      })
-    );
+      // Teams notification
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: userId,
+          notificationType: 'feedback_request',
+          channel: 'teams',
+          scheduledFor
+        })
+      );
+    }
 
     logger.info(`Queued ${notifications.length} feedback notifications for pairing ${pairingId}`);
     return notifications;
@@ -385,6 +397,7 @@ class NotificationService {
   /**
    * Queue a notification to the partner when meeting is confirmed
    * This notifies them that their partner has confirmed and asks for feedback
+   * Creates separate email and teams notification entries for better tracking visibility
    */
   async notifyPartnerMeetingConfirmed(pairingId, confirmerUserId) {
     try {
@@ -398,17 +411,30 @@ class NotificationService {
         ? pairing.user2_id
         : pairing.user1_id;
 
-      // Queue a feedback_request notification for the partner
-      const notification = await this.queueNotification({
-        pairingId,
-        recipientId: partnerId,
-        notificationType: 'feedback_request',
-        channel: 'both'
-      });
+      const notifications = [];
 
-      logger.info(`Queued meeting confirmed notification for partner ${partnerId} on pairing ${pairingId}`);
+      // Queue separate email and teams notifications for the partner
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: partnerId,
+          notificationType: 'feedback_request',
+          channel: 'email'
+        })
+      );
 
-      return notification;
+      notifications.push(
+        await this.queueNotification({
+          pairingId,
+          recipientId: partnerId,
+          notificationType: 'feedback_request',
+          channel: 'teams'
+        })
+      );
+
+      logger.info(`Queued meeting confirmed notifications for partner ${partnerId} on pairing ${pairingId}`);
+
+      return notifications;
     } catch (error) {
       logger.error('Error notifying partner of meeting confirmation:', error);
       throw error;
@@ -418,6 +444,7 @@ class NotificationService {
   /**
    * Send reminder notifications for pending pairings in a round
    * Creates 'reminder' notifications for pairings that haven't been completed yet
+   * Creates separate email and teams notification entries for better tracking visibility
    */
   async sendRemindersForPendingPairings(roundId = null) {
     try {
@@ -464,25 +491,28 @@ class NotificationService {
       const notifications = [];
 
       for (const pairing of pairings) {
-        // Queue reminder for user1
-        notifications.push(
-          await this.queueNotification({
-            pairingId: pairing.id,
-            recipientId: pairing.user1_id,
-            notificationType: 'reminder',
-            channel: 'both'
-          })
-        );
+        // Queue separate email and teams reminders for each user
+        for (const userId of [pairing.user1_id, pairing.user2_id]) {
+          // Email notification
+          notifications.push(
+            await this.queueNotification({
+              pairingId: pairing.id,
+              recipientId: userId,
+              notificationType: 'reminder',
+              channel: 'email'
+            })
+          );
 
-        // Queue reminder for user2
-        notifications.push(
-          await this.queueNotification({
-            pairingId: pairing.id,
-            recipientId: pairing.user2_id,
-            notificationType: 'reminder',
-            channel: 'both'
-          })
-        );
+          // Teams notification
+          notifications.push(
+            await this.queueNotification({
+              pairingId: pairing.id,
+              recipientId: userId,
+              notificationType: 'reminder',
+              channel: 'teams'
+            })
+          );
+        }
       }
 
       logger.info(`Queued ${notifications.length} reminder notifications for ${pairings.length} pairings`);

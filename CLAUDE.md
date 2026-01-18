@@ -102,7 +102,7 @@ npm test             # Run tests
   - `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-sm` - Buttons
   - `.card` - Card containers
   - `.input` - Form inputs
-  - `.badge-*` - Status badges (success, warning, error, info)
+  - `.badge-*` - Status badges (success, warning, error, info, secondary)
   - `.toggle-switch` - iOS-style toggle switches
 - **Icons:** Heroicons (`@heroicons/react/24/outline`)
 - **Animations:** Framer Motion for page transitions and micro-interactions
