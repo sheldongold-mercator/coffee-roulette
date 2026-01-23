@@ -95,7 +95,11 @@ Next matching round: \${nextMatchingDate} (\${matchingFrequency})`;
 module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meetingDate, icebreakers, pairingId, matchingFrequency, nextMatchingDate }) => {
   const pairingUrl = buildFrontendUrl(`/pairings/${pairingId}`);
   const formattedDate = meetingDate ? formatDate(meetingDate) : 'To be scheduled';
-  const icebreakerList = icebreakers.map(topic => `• ${topic}`).join('\n');
+
+  // Handle icebreakers - ensure it's an array
+  const icebreakerArray = Array.isArray(icebreakers) ? icebreakers : [];
+  const hasIcebreakers = icebreakerArray.length > 0;
+  const icebreakerList = hasIcebreakers ? icebreakerArray.map(topic => `• ${topic}`).join('\n') : '';
 
   // Format matching frequency for display
   const frequencyLabel = matchingFrequency
@@ -104,7 +108,7 @@ module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meet
 
   // Format next matching date
   const formattedNextDate = nextMatchingDate ? formatDate(nextMatchingDate) : 'the 1st of next month';
-  const icebreakerHTML = icebreakers.map(topic => `<li>${topic}</li>`).join('');
+  const icebreakerHTML = hasIcebreakers ? icebreakerArray.map(topic => `<li>${topic}</li>`).join('') : '';
 
   const subject = `☕ Coffee Roulette: You've been matched with ${partnerName}!`;
 
@@ -223,13 +227,13 @@ module.exports = ({ userName, partnerName, partnerEmail, partnerDepartment, meet
       </div>` : ''}
     </div>
 
-    <div class="icebreakers">
+    ${hasIcebreakers ? `<div class="icebreakers">
       <h3>💬 Conversation Starters</h3>
       <p>Not sure what to talk about? Try these icebreaker topics:</p>
       <ul>
         ${icebreakerHTML}
       </ul>
-    </div>
+    </div>` : ''}
 
     <h3>What's Next?</h3>
     <ol>
@@ -267,10 +271,10 @@ Name: ${partnerName}
 Email: ${partnerEmail}
 Department: ${partnerDepartment}
 ${meetingDate ? `Scheduled: ${formattedDate}` : ''}
-
+${hasIcebreakers ? `
 CONVERSATION STARTERS
 ${icebreakerList}
-
+` : ''}
 WHAT'S NEXT?
 1. Reach out: Send a quick email to ${partnerName} to introduce yourself
 2. Schedule a time: ${meetingDate ? 'Your meeting is already scheduled!' : 'Find a 30-minute slot that works for both of you'}

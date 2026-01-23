@@ -262,22 +262,28 @@ const getPairings = async (req, res) => {
 };
 
 /**
- * Get user's current/upcoming pairing
+ * Get user's active pairings (pending or confirmed)
+ * Returns up to 3 pairings, ordered oldest first so users address older pairings first
  */
 const getCurrentPairing = async (req, res) => {
   try {
     const user = req.user;
+    const limit = 3;
 
-    const pairing = await Pairing.findOne({
-      where: {
-        [Op.or]: [
-          { user1_id: user.id },
-          { user2_id: user.id }
-        ],
-        status: {
-          [Op.in]: ['pending', 'confirmed', 'completed']
-        }
-      },
+    // Query condition for active pairings (pending or confirmed only)
+    const whereCondition = {
+      [Op.or]: [
+        { user1_id: user.id },
+        { user2_id: user.id }
+      ],
+      status: {
+        [Op.in]: ['pending', 'confirmed']
+      }
+    };
+
+    // Get active pairings (oldest first, so users address older pairings first)
+    const pairings = await Pairing.findAll({
+      where: whereCondition,
       include: [
         {
           association: 'user1',
@@ -305,21 +311,19 @@ const getCurrentPairing = async (req, res) => {
           attributes: ['id', 'rating', 'comments', 'topics_discussed']
         }
       ],
-      order: [['created_at', 'DESC']]
+      order: [['created_at', 'ASC']],
+      limit
     });
 
-    if (!pairing) {
-      return res.json({
-        pairing: null,
-        message: 'No current pairing'
-      });
-    }
+    // Count total active pairings for overflow indicator
+    const activeCount = await Pairing.count({ where: whereCondition });
 
-    const partner = pairing.user1_id === user.id ? pairing.user2 : pairing.user1;
-    const userFeedback = pairing.feedback && pairing.feedback.length > 0 ? pairing.feedback[0] : null;
+    // Format pairings for response
+    const formattedPairings = pairings.map(pairing => {
+      const partner = pairing.user1_id === user.id ? pairing.user2 : pairing.user1;
+      const userFeedback = pairing.feedback && pairing.feedback.length > 0 ? pairing.feedback[0] : null;
 
-    res.json({
-      pairing: {
+      return {
         id: pairing.id,
         partner: {
           id: partner.id,
@@ -348,7 +352,13 @@ const getCurrentPairing = async (req, res) => {
           topicsDiscussed: userFeedback.topics_discussed
         } : null,
         createdAt: pairing.created_at
-      }
+      };
+    });
+
+    res.json({
+      pairings: formattedPairings,
+      activeCount,
+      hasMore: activeCount > limit
     });
   } catch (error) {
     logger.error('Get current pairing error:', error);

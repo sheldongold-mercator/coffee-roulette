@@ -10,9 +10,11 @@ import {
   EnvelopeIcon,
   CheckCircleIcon,
   ClockIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import { departmentAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import TemplatePreviewConfirmModal from '../components/templates/TemplatePreviewConfirmModal';
 
 const DepartmentCard = ({ department, onToggle }) => {
   return (
@@ -91,6 +93,7 @@ const Departments = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [confirmDepartment, setConfirmDepartment] = useState(null);
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false);
 
   const { data: departmentsData, isLoading } = useQuery(['departments', 'v2'], () =>
     departmentAPI.getDepartments()
@@ -142,6 +145,10 @@ const Departments = () => {
     }
   };
 
+  const handleShowPreview = () => {
+    setShowTemplatePreview(true);
+  };
+
   const handleConfirmEnable = () => {
     if (confirmDepartment) {
       toggleMutation.mutate({
@@ -149,6 +156,7 @@ const Departments = () => {
         isEnabled: false,
       });
       setConfirmDepartment(null);
+      setShowTemplatePreview(false);
     }
   };
 
@@ -435,15 +443,32 @@ const Departments = () => {
               </button>
               <button
                 type="button"
-                onClick={handleConfirmEnable}
-                className="btn btn-primary"
+                onClick={handleShowPreview}
+                className="btn btn-primary flex items-center gap-2"
                 disabled={toggleMutation.isLoading}
               >
-                {toggleMutation.isLoading ? 'Enabling...' : 'Enable Department'}
+                <EyeIcon className="w-4 h-4" />
+                Preview Email & Confirm
               </button>
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Template Preview Modal */}
+      {showTemplatePreview && confirmDepartment && (
+        <TemplatePreviewConfirmModal
+          templateType="welcome"
+          channel="email"
+          customData={{ departmentName: confirmDepartment.name }}
+          title="Welcome Email Preview"
+          actionDescription={`Enable ${confirmDepartment.name} and send welcome emails to all users in this department.`}
+          affectedCount={confirmDepartment.totalUsers || 0}
+          confirmButtonText="Enable & Send Emails"
+          isLoading={toggleMutation.isLoading}
+          onConfirm={handleConfirmEnable}
+          onCancel={() => setShowTemplatePreview(false)}
+        />
       )}
     </div>
   );

@@ -76,6 +76,11 @@ export const userAPI = {
   syncUsers: () => api.post('/admin/users/sync'),
   getUserStats: () => api.get('/admin/users/stats'),
   bulkAction: (userIds, action, data) => api.post('/admin/users/bulk', { userIds, action, data }),
+  // Exclusion APIs
+  getUserExclusions: (userId) => api.get(`/admin/users/${userId}/exclusions`),
+  addExclusion: (userId, excludedUserId, reason) =>
+    api.post(`/admin/users/${userId}/exclusions`, { excludedUserId, reason }),
+  removeExclusion: (exclusionId) => api.delete(`/admin/users/exclusions/${exclusionId}`),
 };
 
 // Department APIs

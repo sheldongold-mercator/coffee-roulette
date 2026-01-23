@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import { motion } from 'framer-motion';
 import {
@@ -48,18 +48,34 @@ const Matching = () => {
   );
 
   const { data: eligibleData } = useQuery(['matching-eligible', 'v2'], () =>
-    matchingAPI.getEligibleCount()
+    matchingAPI.getEligibleCount(),
+    {
+      staleTime: 30000, // Consider data stale after 30 seconds
+      refetchOnWindowFocus: true,
+    }
   );
 
   const { data: scheduleData } = useQuery(['matching-schedule'], () =>
     matchingAPI.getSchedule()
   );
 
-  const { data: previewData, isLoading: previewLoading } = useQuery(
+  const { data: previewData, isLoading: previewLoading, refetch: refetchPreview } = useQuery(
     ['matching-preview', 'v2'],
     () => matchingAPI.previewMatching(),
-    { enabled: showPreview }
+    {
+      enabled: showPreview,
+      staleTime: 0, // Always consider data stale
+      cacheTime: 0, // Don't cache - always fetch fresh
+      refetchOnMount: 'always',
+    }
   );
+
+  // Refetch preview when toggled on to ensure fresh data
+  useEffect(() => {
+    if (showPreview) {
+      queryClient.invalidateQueries(['matching-preview', 'v2']);
+    }
+  }, [showPreview, queryClient]);
 
   // Handle axios response wrapper: response.data.data
   const rounds = Array.isArray(roundsData?.data?.data)
@@ -416,7 +432,20 @@ const Matching = () => {
                     </td>
                     <td className="text-gray-600">{round.totalPairings || 0}</td>
                     <td>
-                      <span className="badge badge-success">Completed</span>
+                      {(() => {
+                        const status = round.status || 'completed';
+                        switch (status) {
+                          case 'in_progress':
+                            return <span className="badge badge-info">In Progress</span>;
+                          case 'scheduled':
+                            return <span className="badge badge-warning">Scheduled</span>;
+                          case 'failed':
+                            return <span className="badge badge-error">Failed</span>;
+                          case 'completed':
+                          default:
+                            return <span className="badge badge-success">Completed</span>;
+                        }
+                      })()}
                     </td>
                     <td>
                       <button

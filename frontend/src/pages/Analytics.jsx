@@ -11,6 +11,7 @@ import {
   StarIcon,
 } from '@heroicons/react/24/outline';
 import { analyticsAPI } from '../services/api';
+import UserDetailModal from '../components/users/UserDetailModal';
 import {
   BarChart,
   Bar,
@@ -32,6 +33,7 @@ const COLORS = ['#0284c7', '#d946ef', '#10b981', '#f59e0b', '#ef4444'];
 
 const Analytics = () => {
   const [satisfactionMonths, setSatisfactionMonths] = useState(6);
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   const { data: departmentStats, isLoading: deptLoading } = useQuery(
     ['department-stats', 'v2'],
@@ -562,7 +564,7 @@ const Analytics = () => {
           <div className="space-y-3">
             {leaders.map((leader, index) => (
               <div
-                key={index}
+                key={leader.id || index}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
               >
                 <div className="flex items-center gap-4">
@@ -580,7 +582,12 @@ const Analytics = () => {
                     {index + 1}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{leader.name}</p>
+                    <button
+                      onClick={() => leader.id && setSelectedUserId(leader.id)}
+                      className="font-medium text-gray-900 hover:text-primary-600 hover:underline text-left transition-colors"
+                    >
+                      {leader.name}
+                    </button>
                     <p className="text-sm text-gray-500">{leader.department}</p>
                   </div>
                 </div>
@@ -593,6 +600,14 @@ const Analytics = () => {
           </div>
         )}
       </motion.div>
+
+      {/* User Detail Modal */}
+      {selectedUserId && (
+        <UserDetailModal
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+        />
+      )}
     </div>
   );
 };

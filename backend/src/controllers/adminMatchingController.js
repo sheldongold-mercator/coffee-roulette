@@ -103,7 +103,7 @@ const getMatchingRounds = async (req, res) => {
       include: [
         {
           association: 'pairings',
-          attributes: [],
+          attributes: ['id', 'status'],
           duplicating: false
         }
       ],
@@ -113,18 +113,31 @@ const getMatchingRounds = async (req, res) => {
     });
 
     res.json({
-      data: rounds.rows.map(round => ({
-        id: round.id,
-        name: round.name,
-        scheduledDate: round.scheduled_date,
-        executedAt: round.executed_at,
-        status: round.status,
-        totalParticipants: round.total_participants,
-        totalPairings: round.total_pairings,
-        errorMessage: round.error_message,
-        createdAt: round.created_at,
-        source: round.source || null
-      })),
+      data: rounds.rows.map(round => {
+        // Compute effective status based on pairing completion
+        let effectiveStatus = round.status;
+        if (round.status === 'completed' && round.pairings && round.pairings.length > 0) {
+          const hasActivePairings = round.pairings.some(p =>
+            p.status === 'pending' || p.status === 'confirmed'
+          );
+          if (hasActivePairings) {
+            effectiveStatus = 'in_progress';
+          }
+        }
+
+        return {
+          id: round.id,
+          name: round.name,
+          scheduledDate: round.scheduled_date,
+          executedAt: round.executed_at,
+          status: effectiveStatus,
+          totalParticipants: round.total_participants,
+          totalPairings: round.total_pairings,
+          errorMessage: round.error_message,
+          createdAt: round.created_at,
+          source: round.source || null
+        };
+      }),
       pagination: {
         total: rounds.count,
         page: parseInt(page, 10),
@@ -600,6 +613,13 @@ const runManualMatching = async (req, res) => {
       resetAutoSchedule: options.resetAutoSchedule || false,
       triggeredByUserId: req.user.id
     });
+
+    // Notify admin users about the completed matching round
+    try {
+      await notificationService.notifyAdminsMatchingComplete(result);
+    } catch (adminNotifyError) {
+      logger.error('Failed to notify admins of manual matching (non-fatal):', adminNotifyError);
+    }
 
     res.json({
       message: 'Manual matching completed successfully',

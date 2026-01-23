@@ -14,6 +14,7 @@ import {
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { matchingAPI } from '../../services/api';
 import { format } from 'date-fns';
+import UserDetailModal from '../users/UserDetailModal';
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'text-amber-600 bg-amber-100' },
@@ -40,6 +41,7 @@ const StarRating = ({ rating }) => {
 
 const MatchingRoundModal = ({ roundId, onClose }) => {
   const [reminderResult, setReminderResult] = useState(null);
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   const { data: roundData, isLoading } = useQuery(
     ['matching-round', roundId],
@@ -197,9 +199,12 @@ const MatchingRoundModal = ({ roundId, onClose }) => {
                                 {pairing.user1?.firstName?.charAt(0) || '?'}
                               </div>
                               <div>
-                                <p className="font-medium text-gray-900">
+                                <button
+                                  onClick={() => pairing.user1?.id && setSelectedUserId(pairing.user1.id)}
+                                  className="font-medium text-gray-900 hover:text-primary-600 hover:underline text-left transition-colors"
+                                >
                                   {pairing.user1?.firstName} {pairing.user1?.lastName}
-                                </p>
+                                </button>
                                 <p className="text-sm text-gray-500">
                                   {pairing.user1?.department || 'No department'}
                                 </p>
@@ -222,9 +227,12 @@ const MatchingRoundModal = ({ roundId, onClose }) => {
                                 {pairing.user2?.firstName?.charAt(0) || '?'}
                               </div>
                               <div>
-                                <p className="font-medium text-gray-900">
+                                <button
+                                  onClick={() => pairing.user2?.id && setSelectedUserId(pairing.user2.id)}
+                                  className="font-medium text-gray-900 hover:text-primary-600 hover:underline text-left transition-colors"
+                                >
                                   {pairing.user2?.firstName} {pairing.user2?.lastName}
-                                </p>
+                                </button>
                                 <p className="text-sm text-gray-500">
                                   {pairing.user2?.department || 'No department'}
                                 </p>
@@ -324,6 +332,14 @@ const MatchingRoundModal = ({ roundId, onClose }) => {
           )}
         </div>
       </motion.div>
+
+      {/* User Detail Modal */}
+      {selectedUserId && (
+        <UserDetailModal
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+        />
+      )}
     </motion.div>
   );
 };

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminUserController = require('../../controllers/adminUserController');
+const adminExclusionController = require('../../controllers/adminExclusionController');
 const { ensureAuthenticated } = require('../../middleware/authentication');
 const { ensureAdmin } = require('../../middleware/authorization');
 
@@ -49,5 +50,26 @@ router.get('/:userId', adminUserController.getUserById);
  * @access  Admin
  */
 router.put('/:userId', adminUserController.updateUser);
+
+/**
+ * @route   GET /api/admin/users/:userId/exclusions
+ * @desc    Get exclusions for a specific user
+ * @access  Admin
+ */
+router.get('/:userId/exclusions', adminExclusionController.getUserExclusions);
+
+/**
+ * @route   POST /api/admin/users/:userId/exclusions
+ * @desc    Add an exclusion for a user
+ * @access  Admin
+ */
+router.post('/:userId/exclusions', adminExclusionController.addExclusion);
+
+/**
+ * @route   DELETE /api/admin/users/exclusions/:exclusionId
+ * @desc    Remove an exclusion
+ * @access  Admin
+ */
+router.delete('/exclusions/:exclusionId', adminExclusionController.removeExclusion);
 
 module.exports = router;

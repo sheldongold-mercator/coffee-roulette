@@ -64,6 +64,37 @@ class NotificationService {
   }
 
   /**
+   * Log an admin notification email that was sent
+   * Admin notifications are sent directly (not queued) so we log them after sending
+   */
+  async logAdminNotification(recipientId, notificationType, status = 'sent', errorMessage = null) {
+    try {
+      const notification = await NotificationQueue.create({
+        pairing_id: null,
+        recipient_user_id: recipientId,
+        notification_type: notificationType,
+        channel: 'email',
+        status,
+        scheduled_for: new Date(),
+        sent_at: status === 'sent' ? new Date() : null,
+        error_message: errorMessage
+      });
+
+      logger.info('Admin notification logged:', {
+        id: notification.id,
+        recipient: recipientId,
+        type: notificationType,
+        status
+      });
+
+      return notification;
+    } catch (error) {
+      logger.error('Error logging admin notification:', error);
+      // Don't throw - logging failure shouldn't block the main flow
+    }
+  }
+
+  /**
    * Queue pairing notifications for both users
    * Creates separate email and teams notification entries for better tracking visibility
    */
@@ -278,6 +309,14 @@ class NotificationService {
       const user = recipient;
       const partner = isUser1 ? pairing.user2 : pairing.user1;
       const icebreakers = pairing.icebreakers || [];
+
+      // Log icebreaker info for debugging
+      logger.info('Sending notification with icebreakers:', {
+        notificationId: notification.id,
+        pairingId: pairing.id,
+        icebreakerCount: icebreakers.length,
+        icebreakers: icebreakers.map(ib => ({ id: ib.id, topic: ib.topic }))
+      });
 
       let result = {};
 
@@ -551,6 +590,12 @@ class NotificationService {
    */
   async notifyAdminsMatchingComplete(roundResult) {
     try {
+      logger.info('Starting admin notification for matching completion:', {
+        roundId: roundResult?.round?.id,
+        roundName: roundResult?.round?.name,
+        totalPairings: roundResult?.round?.totalPairings
+      });
+
       // Get all admin users with their user details
       const adminUsers = await AdminUser.findAll({
         include: [{
@@ -564,7 +609,7 @@ class NotificationService {
         return { sent: 0, total: 0 };
       }
 
-      logger.info(`Notifying ${adminUsers.length} admin users about matching completion`);
+      logger.info(`Found ${adminUsers.length} admin users to notify`);
 
       // Load admin notification template
       const adminTemplate = require('../templates/emails/admin_matching_complete');
@@ -597,9 +642,15 @@ class NotificationService {
             textBody: text
           });
 
+          // Log the notification for the Comms tab
+          await this.logAdminNotification(admin.user.id, 'admin_matching_complete', 'sent');
+
           results.push({ success: true, email: admin.user.email });
           logger.info(`Admin notification sent to ${admin.user.email}`);
         } catch (error) {
+          // Log the failed notification attempt
+          await this.logAdminNotification(admin.user.id, 'admin_matching_complete', 'failed', error.message);
+
           results.push({ success: false, email: admin.user.email, error: error.message });
           logger.error(`Failed to notify admin ${admin.user.email}:`, error);
         }

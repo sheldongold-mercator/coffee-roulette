@@ -14,7 +14,8 @@ const models = {
   NotificationQueue: require('./NotificationQueue')(sequelize),
   NotificationTemplate: require('./NotificationTemplate')(sequelize),
   AdminUser: require('./AdminUser')(sequelize),
-  AuditLog: require('./AuditLog')(sequelize)
+  AuditLog: require('./AuditLog')(sequelize),
+  MatchingExclusion: require('./MatchingExclusion')(sequelize)
 };
 
 // Set up associations

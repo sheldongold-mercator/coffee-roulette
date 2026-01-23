@@ -15,6 +15,11 @@ import {
   CogIcon,
   DocumentTextIcon,
   SparklesIcon,
+  NoSymbolIcon,
+  PlusIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { userAPI, departmentAPI } from '../../services/api';
@@ -55,6 +60,7 @@ const notificationTypeConfig = {
   reminder: { label: 'Meeting Reminder', icon: CalendarIcon },
   feedback_request: { label: 'Feedback Request', icon: StarIcon },
   admin_alert: { label: 'Admin Alert', icon: ExclamationTriangleIcon },
+  admin_matching_complete: { label: 'Matching Complete', icon: CheckCircleIcon },
 };
 
 const channelConfig = {
@@ -68,6 +74,10 @@ const UserDetailModal = ({ userId, onClose }) => {
   const [activeTab, setActiveTab] = useState('profile');
   const [formData, setFormData] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [showAddExclusion, setShowAddExclusion] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [selectedExcludedUser, setSelectedExcludedUser] = useState(null);
+  const [exclusionReason, setExclusionReason] = useState('');
 
   // Fetch user details
   const { data: userData, isLoading, isError, error } = useQuery(
@@ -118,6 +128,58 @@ const UserDetailModal = ({ userId, onClose }) => {
     : Array.isArray(departmentsData?.data)
     ? departmentsData.data
     : [];
+
+  // Fetch user exclusions
+  const { data: exclusionsData, isLoading: exclusionsLoading } = useQuery(
+    ['user-exclusions', userId],
+    () => userAPI.getUserExclusions(userId),
+    { enabled: !!userId }
+  );
+
+  const exclusions = exclusionsData?.data?.data || [];
+
+  // Fetch all users for exclusion search
+  const { data: allUsersData } = useQuery(
+    ['users-search', userSearchTerm],
+    () => userAPI.getUsers({ search: userSearchTerm, limit: 10 }),
+    { enabled: userSearchTerm.length >= 2 }
+  );
+
+  const searchResults = (allUsersData?.data?.data || []).filter(
+    (u) => u.id !== userId && !exclusions.some((e) => e.excludedUser.id === u.id)
+  );
+
+  // Add exclusion mutation
+  const addExclusionMutation = useMutation(
+    ({ excludedUserId, reason }) => userAPI.addExclusion(userId, excludedUserId, reason),
+    {
+      onSuccess: () => {
+        toast.success('Exclusion added successfully');
+        queryClient.invalidateQueries(['user-exclusions', userId]);
+        setShowAddExclusion(false);
+        setSelectedExcludedUser(null);
+        setExclusionReason('');
+        setUserSearchTerm('');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'Failed to add exclusion');
+      },
+    }
+  );
+
+  // Remove exclusion mutation
+  const removeExclusionMutation = useMutation(
+    (exclusionId) => userAPI.removeExclusion(exclusionId),
+    {
+      onSuccess: () => {
+        toast.success('Exclusion removed successfully');
+        queryClient.invalidateQueries(['user-exclusions', userId]);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'Failed to remove exclusion');
+      },
+    }
+  );
 
   // Update mutation
   const updateMutation = useMutation(
@@ -320,6 +382,16 @@ const UserDetailModal = ({ userId, onClose }) => {
               }`}
             >
               Comms ({notificationHistory.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('exclusions')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                activeTab === 'exclusions'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Exclusions ({exclusions.length})
             </button>
           </nav>
         </div>
@@ -671,7 +743,203 @@ const UserDetailModal = ({ userId, onClose }) => {
                 })
               )}
             </div>
-          ) : (
+          ) : activeTab === 'exclusions' ? (
+            /* Exclusions Tab */
+            <div className="space-y-4">
+              {/* Add Exclusion Section */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-gray-700">
+                    <NoSymbolIcon className="w-4 h-4 inline mr-1" />
+                    Matching Exclusions
+                  </h4>
+                  {!showAddExclusion && (
+                    <button
+                      onClick={() => setShowAddExclusion(true)}
+                      className="btn btn-sm btn-secondary flex items-center gap-1"
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                      Add Exclusion
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mb-4">
+                  Users in this list will never be matched with {user?.firstName} {user?.lastName}.
+                </p>
+
+                {/* Add Exclusion Form */}
+                {showAddExclusion && (
+                  <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+                    <h5 className="text-sm font-medium text-gray-700 mb-3">Add New Exclusion</h5>
+
+                    {/* User Search */}
+                    <div className="mb-3">
+                      <label className="block text-sm text-gray-600 mb-1">Search for user to exclude:</label>
+                      <div className="relative">
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={userSearchTerm}
+                          onChange={(e) => setUserSearchTerm(e.target.value)}
+                          placeholder="Search by name or email..."
+                          className="input w-full pl-9"
+                        />
+                      </div>
+
+                      {/* Search Results Dropdown */}
+                      {userSearchTerm.length >= 2 && searchResults.length > 0 && !selectedExcludedUser && (
+                        <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-lg max-h-40 overflow-y-auto">
+                          {searchResults.map((u) => (
+                            <button
+                              key={u.id}
+                              onClick={() => {
+                                setSelectedExcludedUser(u);
+                                setUserSearchTerm(`${u.firstName} ${u.lastName}`);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 border-b border-gray-100 last:border-b-0"
+                            >
+                              <div className="flex items-center justify-center w-8 h-8 bg-gray-200 rounded-full text-gray-600 text-sm font-medium">
+                                {u.firstName?.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{u.firstName} {u.lastName}</p>
+                                <p className="text-xs text-gray-500">{u.email}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {userSearchTerm.length >= 2 && searchResults.length === 0 && !selectedExcludedUser && (
+                        <p className="mt-1 text-sm text-gray-500">No users found</p>
+                      )}
+                    </div>
+
+                    {/* Selected User Display */}
+                    {selectedExcludedUser && (
+                      <div className="mb-3 p-2 bg-primary-50 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center w-8 h-8 bg-primary-100 rounded-full text-primary-600 text-sm font-medium">
+                            {selectedExcludedUser.firstName?.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{selectedExcludedUser.firstName} {selectedExcludedUser.lastName}</p>
+                            <p className="text-xs text-gray-500">{selectedExcludedUser.department?.name || 'No Department'}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedExcludedUser(null);
+                            setUserSearchTerm('');
+                          }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <XMarkIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Reason Input */}
+                    <div className="mb-3">
+                      <label className="block text-sm text-gray-600 mb-1">Reason (optional):</label>
+                      <input
+                        type="text"
+                        value={exclusionReason}
+                        onChange={(e) => setExclusionReason(e.target.value)}
+                        placeholder="e.g., Manager/direct report, previous conflict..."
+                        className="input w-full"
+                      />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setShowAddExclusion(false);
+                          setSelectedExcludedUser(null);
+                          setUserSearchTerm('');
+                          setExclusionReason('');
+                        }}
+                        className="btn btn-sm btn-secondary"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (selectedExcludedUser) {
+                            addExclusionMutation.mutate({
+                              excludedUserId: selectedExcludedUser.id,
+                              reason: exclusionReason || null,
+                            });
+                          }
+                        }}
+                        disabled={!selectedExcludedUser || addExclusionMutation.isLoading}
+                        className="btn btn-sm btn-primary disabled:opacity-50"
+                      >
+                        {addExclusionMutation.isLoading ? 'Adding...' : 'Add Exclusion'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Exclusions List */}
+                {exclusionsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+                  </div>
+                ) : exclusions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <NoSymbolIcon className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm">No exclusions configured</p>
+                    <p className="text-xs mt-1">This user can be matched with anyone in the eligible pool.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {exclusions.map((exclusion) => (
+                      <div
+                        key={exclusion.id}
+                        className="bg-white rounded-lg border border-gray-200 p-3 flex items-center justify-between group hover:border-gray-300 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full text-red-600 font-semibold">
+                            {exclusion.excludedUser.firstName?.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {exclusion.excludedUser.firstName} {exclusion.excludedUser.lastName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {exclusion.excludedUser.department || 'No Department'}
+                              {exclusion.reason && (
+                                <span className="ml-2 text-gray-400">• {exclusion.reason}</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeExclusionMutation.mutate(exclusion.id)}
+                          disabled={removeExclusionMutation.isLoading}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                          title="Remove exclusion"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Info Note */}
+              <div className="bg-blue-50 rounded-lg p-3 flex items-start gap-2">
+                <InformationCircleIcon className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-700">
+                  <p className="font-medium">How exclusions work</p>
+                  <p className="mt-1">Exclusions are bidirectional - if User A is excluded from User B, they will never be matched together regardless of which user's profile the exclusion was added from.</p>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'communications' ? (
             /* Communications Tab */
             <div className="space-y-4">
               {notificationHistory.length === 0 ? (
@@ -744,7 +1012,7 @@ const UserDetailModal = ({ userId, onClose }) => {
                 })
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Footer */}

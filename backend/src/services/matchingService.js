@@ -1,4 +1,4 @@
-const { User, MatchingRound, Pairing, Department, SystemSetting, IcebreakerTopic, PairingIcebreaker } = require('../models');
+const { User, MatchingRound, Pairing, Department, SystemSetting, IcebreakerTopic, PairingIcebreaker, MatchingExclusion } = require('../models');
 const { Op } = require('sequelize');
 const { shuffleArray, getRandomItems } = require('../utils/helpers');
 const logger = require('../utils/logger');
@@ -18,6 +18,40 @@ class MatchingService {
       logger.error(`Error getting setting ${key}:`, error);
       return defaultValue;
     }
+  }
+
+  /**
+   * Get all exclusions as a Set for quick lookup
+   * Returns a Set of "smallerId-largerId" strings
+   */
+  async getExclusions() {
+    try {
+      const exclusions = await MatchingExclusion.findAll({
+        attributes: ['user1_id', 'user2_id']
+      });
+
+      // Build a Set of exclusion pairs for O(1) lookup
+      // Format: "smallerId-largerId" to ensure consistent ordering
+      const exclusionSet = new Set();
+      for (const exc of exclusions) {
+        const [smaller, larger] = [exc.user1_id, exc.user2_id].sort((a, b) => a - b);
+        exclusionSet.add(`${smaller}-${larger}`);
+      }
+
+      logger.info(`Loaded ${exclusionSet.size} exclusion pairs`);
+      return exclusionSet;
+    } catch (error) {
+      logger.error('Error getting exclusions:', error);
+      return new Set();
+    }
+  }
+
+  /**
+   * Check if two users are excluded from being matched
+   */
+  isExcluded(user1Id, user2Id, exclusionSet) {
+    const [smaller, larger] = [user1Id, user2Id].sort((a, b) => a - b);
+    return exclusionSet.has(`${smaller}-${larger}`);
   }
 
   /**
@@ -243,10 +277,13 @@ class MatchingService {
         logger.info('Ignoring recent pairing history for this round');
       }
 
-      // 3. Shuffle participants for randomness
+      // 3. Get exclusions for constraint checking
+      const exclusionSet = await this.getExclusions();
+
+      // 4. Shuffle participants for randomness
       const shuffled = shuffleArray(participants);
 
-      // 4. Create pairings using greedy algorithm with scoring
+      // 5. Create pairings using greedy algorithm with scoring
       const pairings = [];
       const used = new Set();
 
@@ -259,6 +296,11 @@ class MatchingService {
         // Find best match for this user
         for (let j = i + 1; j < shuffled.length; j++) {
           if (used.has(shuffled[j].id)) continue;
+
+          // Check if these users are excluded from matching
+          if (this.isExcluded(shuffled[i].id, shuffled[j].id, exclusionSet)) {
+            continue; // Skip this potential match
+          }
 
           const score = await this.calculateMatchScore(
             shuffled[i],
