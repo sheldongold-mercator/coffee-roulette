@@ -4,7 +4,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const passport = require('./config/passport');
 const logger = require('./utils/logger');
-const { getCorsOrigin } = require('./config/urls');
+const { getCorsOrigin, getFrontendUrl } = require('./config/urls');
 
 // Create Express app
 const app = express();
@@ -12,8 +12,42 @@ const app = express();
 // Initialize Passport
 app.use(passport.initialize());
 
-// Security middleware
-app.use(helmet());
+// Security middleware with Content Security Policy
+const frontendUrl = getFrontendUrl();
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://login.microsoftonline.com"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: [
+        "'self'",
+        frontendUrl,
+        "https://login.microsoftonline.com",
+        "https://graph.microsoft.com"
+      ],
+      frameSrc: ["'self'", "https://login.microsoftonline.com"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  // HSTS - enforce HTTPS
+  strictTransportSecurity: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  // Prevent clickjacking
+  frameguard: { action: 'deny' },
+  // Prevent MIME type sniffing
+  noSniff: true,
+  // XSS filter
+  xssFilter: true,
+  // Referrer policy
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
 
 // CORS configuration
 const corsOptions = {

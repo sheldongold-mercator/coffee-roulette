@@ -34,18 +34,24 @@ const TemplatePreview = ({ channel, data, onClose }) => {
           }
 
           adaptiveCard.parse(cardContent);
-          teamsCardRef.current.innerHTML = '';
+          // Clear container safely (no innerHTML)
+          while (teamsCardRef.current.firstChild) {
+            teamsCardRef.current.removeChild(teamsCardRef.current.firstChild);
+          }
           const renderedCard = adaptiveCard.render();
           if (renderedCard) {
             teamsCardRef.current.appendChild(renderedCard);
           }
         } catch (error) {
           console.error('Error rendering adaptive card:', error);
-          teamsCardRef.current.innerHTML = `
-            <div class="text-red-500 p-4">
-              Error rendering card: ${error.message}
-            </div>
-          `;
+          // Use textContent for error messages to avoid XSS
+          while (teamsCardRef.current.firstChild) {
+            teamsCardRef.current.removeChild(teamsCardRef.current.firstChild);
+          }
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'text-red-500 p-4';
+          errorDiv.textContent = `Error rendering card: ${error.message}`;
+          teamsCardRef.current.appendChild(errorDiv);
         }
       }).catch((error) => {
         console.error('Error loading adaptivecards:', error);
@@ -139,7 +145,7 @@ const TemplatePreview = ({ channel, data, onClose }) => {
                       height: '500px',
                       border: 'none',
                     }}
-                    sandbox="allow-same-origin"
+                    sandbox=""
                   />
                 </div>
 

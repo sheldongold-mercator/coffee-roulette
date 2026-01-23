@@ -5,6 +5,95 @@
 
 const { formatDate } = require('./helpers');
 const { buildFrontendUrl } = require('../config/urls');
+const sanitizeHtmlLib = require('sanitize-html');
+
+/**
+ * SECURITY: Sanitize HTML content to prevent XSS attacks
+ * Uses a strict whitelist of safe tags and attributes for email templates
+ *
+ * @param {string} html - Raw HTML content
+ * @returns {string} - Sanitized HTML
+ */
+function sanitizeHtml(html) {
+  if (!html) return '';
+
+  return sanitizeHtmlLib(html, {
+    // Allow safe HTML tags for email formatting
+    allowedTags: [
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'p', 'div', 'span', 'br', 'hr',
+      'strong', 'b', 'em', 'i', 'u', 's', 'strike',
+      'ul', 'ol', 'li',
+      'a', 'img',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td',
+      'blockquote', 'pre', 'code',
+      'center', 'font'
+    ],
+    // Allow safe attributes
+    allowedAttributes: {
+      '*': ['style', 'class', 'id'],
+      'a': ['href', 'target', 'rel'],
+      'img': ['src', 'alt', 'width', 'height'],
+      'table': ['border', 'cellpadding', 'cellspacing', 'width', 'align'],
+      'td': ['width', 'height', 'align', 'valign', 'colspan', 'rowspan', 'bgcolor'],
+      'th': ['width', 'height', 'align', 'valign', 'colspan', 'rowspan', 'bgcolor'],
+      'tr': ['bgcolor'],
+      'font': ['color', 'size', 'face']
+    },
+    // Allow template variables in all attributes
+    allowedSchemes: ['http', 'https', 'mailto'],
+    // Disallow dangerous protocols
+    disallowedTagsMode: 'discard',
+    // Don't allow any data URLs except in src for images
+    allowedSchemesByTag: {
+      'img': ['http', 'https', 'data'],
+      'a': ['http', 'https', 'mailto']
+    },
+    // Remove dangerous attributes
+    transformTags: {
+      'a': function(tagName, attribs) {
+        // Ensure target="_blank" links have rel="noopener"
+        if (attribs.target === '_blank') {
+          attribs.rel = 'noopener noreferrer';
+        }
+        return { tagName, attribs };
+      }
+    },
+    // Preserve template variables like ${variableName}
+    textFilter: function(text) {
+      return text;
+    },
+    // Allow style attributes but sanitize their content
+    allowedStyles: {
+      '*': {
+        'color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/, /^rgba\(/, /^[a-zA-Z]+$/],
+        'background-color': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/, /^rgba\(/, /^[a-zA-Z]+$/],
+        'background': [/^#[0-9a-fA-F]{3,6}$/, /^rgb\(/, /^rgba\(/, /^[a-zA-Z]+$/],
+        'text-align': [/^(left|right|center|justify)$/],
+        'font-size': [/^\d+px$/, /^\d+pt$/, /^\d+em$/],
+        'font-weight': [/^(normal|bold|\d{3})$/],
+        'font-family': [/.*/],
+        'line-height': [/^\d+(\.\d+)?(px|em|%)?$/],
+        'margin': [/^[\d\s]+(px|em|%)?$/],
+        'margin-top': [/^\d+(px|em|%)?$/],
+        'margin-bottom': [/^\d+(px|em|%)?$/],
+        'margin-left': [/^\d+(px|em|%)?$/],
+        'margin-right': [/^\d+(px|em|%)?$/],
+        'padding': [/^[\d\s]+(px|em|%)?$/],
+        'padding-top': [/^\d+(px|em|%)?$/],
+        'padding-bottom': [/^\d+(px|em|%)?$/],
+        'padding-left': [/^\d+(px|em|%)?$/],
+        'padding-right': [/^\d+(px|em|%)?$/],
+        'border': [/.*/],
+        'border-radius': [/^\d+(px|%)?$/],
+        'width': [/^\d+(px|%)?$/, /^auto$/],
+        'height': [/^\d+(px|%)?$/, /^auto$/],
+        'display': [/^(block|inline|inline-block|flex|none)$/],
+        'text-decoration': [/^(none|underline|line-through)$/]
+      }
+    }
+  });
+}
 
 /**
  * Interpolate variables in a template string
@@ -184,5 +273,6 @@ module.exports = {
   prepareVariables,
   escapeHtml,
   interpolateJson,
-  validateTemplate
+  validateTemplate,
+  sanitizeHtml
 };

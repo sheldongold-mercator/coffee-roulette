@@ -163,6 +163,10 @@ const Dashboard = () => {
             <div className="h-64 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
+          ) : trends.length === 0 || trends.every(t => t.rate === 0) ? (
+            <div className="h-64 flex items-center justify-center">
+              <p className="text-sm text-gray-500">No participation data yet</p>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={trends}>
@@ -185,10 +189,13 @@ const Dashboard = () => {
                     border: '1px solid #e5e7eb',
                     borderRadius: '0.5rem',
                   }}
+                  formatter={(value, name) => [value, 'Participants']}
+                  labelFormatter={(label) => label}
                 />
                 <Area
                   type="monotone"
                   dataKey="rate"
+                  name="Participants"
                   stroke="#0284c7"
                   strokeWidth={2}
                   fillOpacity={1}

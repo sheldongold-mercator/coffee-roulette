@@ -47,7 +47,10 @@ const PortalHome = () => {
     }
   );
 
-  const pairing = pairingData?.data?.pairing;
+  // API returns pairings array, not single pairing
+  const pairings = pairingData?.data?.pairings || [];
+  const pairing = pairings.length > 0 ? pairings[0] : null;
+  const hasMultiplePairings = pairings.length > 1 || pairingData?.data?.hasMore;
   const profile = profileData?.data?.user;
   const isLoading = pairingLoading || profileLoading;
 
@@ -219,6 +222,26 @@ const PortalHome = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Multiple Pairings Notice */}
+      {hasMultiplePairings && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-2xl"
+        >
+          <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 bg-blue-100 rounded-xl">
+            <span className="text-lg">&#9734;</span>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm text-blue-800">
+              <span className="font-medium">You have multiple coffee chats pending!</span>{' '}
+              Check your <a href="/portal/history" className="underline font-medium">pairing history</a> to see all of them.
+            </p>
           </div>
         </motion.div>
       )}

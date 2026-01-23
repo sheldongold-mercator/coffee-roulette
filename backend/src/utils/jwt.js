@@ -1,7 +1,21 @@
 const jwt = require('jsonwebtoken');
 const logger = require('./logger');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// SECURITY: JWT_SECRET must be explicitly configured - no fallback
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  const errorMsg = 'CRITICAL SECURITY ERROR: JWT_SECRET environment variable is not set. ' +
+    'This is required for secure token signing. ' +
+    'Set JWT_SECRET in your .env file with a strong random value (minimum 32 characters).';
+  logger.error(errorMsg);
+  throw new Error(errorMsg);
+}
+
+// Warn if JWT_SECRET appears to be weak
+if (JWT_SECRET.length < 32) {
+  logger.warn('WARNING: JWT_SECRET is shorter than 32 characters. Consider using a longer, more secure value.');
+}
+
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 /**

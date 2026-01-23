@@ -41,33 +41,25 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Location:** `backend/src/controllers/adminUserController.js`, `backend/src/controllers/adminMatchingController.js`
 - **Note:** Use ULTRATHINK when implementing
 
-### 2. Log Communications in User Details
-- [x] **Type:** Bug
-- **Description:** When emails are sent to users (welcome, matching, etc.), there is no log visible in their View Details page. Add a communications history tab/section.
-- **Location:** `frontend/src/components/users/UserDetailModal.jsx`, `backend/src/controllers/`
-- **Completed:** Fixed notification query in getUserById to use `required: false` on Pairing include and nested User includes. This ensures notifications with NULL pairing_id (like welcome emails) are properly retrieved and displayed in the Comms tab.
-
 ### 20. Revert Pairing Notifications to Separate Entries
-- [x] **Type:** Enhancement
+- [~] **Type:** Enhancement
 - **Description:** Revert the pairing notification logging to create separate Email and Teams entries instead of a combined "Email & Teams" entry. The separate logs provide better visibility into which channel was used.
 - **Location:** `backend/src/services/notificationService.js`
-- **Completed:** Updated all notification queuing methods (queuePairingNotifications, queueReminderNotifications, queueFeedbackNotifications, notifyPartnerMeetingConfirmed, sendRemindersForPendingPairings) to create separate 'email' and 'teams' entries instead of combined 'both' entries. This provides better visibility into which channel was used for each notification.
+- **Issues Found:**
+  - Only one channel (Email or Teams) is showing in the Comms tab, not both
+  - Need to verify that both 'email' and 'teams' entries are being created and displayed
 
 ### 21. Welcome Email for Users Synced to Active Department
-- [x] **Type:** Enhancement
+- [~] **Type:** Enhancement
 - **Description:** When a new user is synced from Microsoft and their department is already active, they should immediately receive the Welcome Email and be auto-opted-in (with grace period). Currently this may only happen when a department is first enabled.
 - **Location:** `backend/src/jobs/dailyUserSync.js`, `backend/src/services/`
-- **Completed:** Feature was already implemented correctly - welcome emails are sent and logged via logWelcomeEmail(). The display issue in the Comms tab was fixed as part of item #2 (notification query fix). New users synced to active departments will receive welcome emails which now appear correctly in the User Details Comms tab.
+- **Issues Found:**
+  - Users receive the welcome email but do NOT receive a Teams message
+  - Need to add Teams notification to the welcome flow for new synced users
 
 ---
 
 ## Medium Priority
-
-### 47. Users in Grace Period Unexpectedly Showing as Opted Out
-- [x] **Type:** Bug (Critical)
-- **Description:** When users are invited/synced to the app and their department is already enabled, they correctly enter grace period status initially. However, shortly after they are all showing as opted out. This may be caused by a scheduled job or sync process that is resetting user status incorrectly. Investigate the daily user sync job and any other processes that modify user opt-in status.
-- **Location:** `backend/src/routes/public.js`
-- **Completed:** Root cause identified: Email security scanners (Microsoft Defender Safe Links, corporate email gateways) were automatically scanning all links in welcome emails by making GET requests. The opt-out endpoint was immediately processing opt-outs on GET requests, violating REST principles where GET should be safe/idempotent. Fix: Changed opt-out (and opt-in) endpoints to show a confirmation page on GET request instead of immediately processing. The actual opt-out now requires a POST request via form submission. This prevents email security scanners from triggering automatic opt-outs while still providing a user-friendly confirmation flow.
 
 ### 10. Fix Send Email Link in Portal
 - [x] **Type:** Bug
@@ -76,10 +68,12 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Completed:** Changed the Send Email button from an `<a>` tag to a `<button>` with an onClick handler that uses `window.location.href` for the mailto URL. This approach has better cross-browser compatibility for triggering the email client with pre-filled subject and body.
 
 ### 12. Notify Partner When Meeting Confirmed
-- [x] **Type:** Enhancement
+- [~] **Type:** Enhancement
 - **Description:** When one person in a pairing clicks "We Had Our Coffee", the other person should be notified and given a link to provide their own feedback.
 - **Location:** `backend/src/controllers/userController.js`, `backend/src/services/notificationService.js`
-- **Completed:** Added notifyPartnerMeetingConfirmed method to notificationService that queues a feedback_request notification to the partner when meeting is confirmed. Updated confirmMeeting endpoint to call this method.
+- **Issues Found:**
+  - Needs testing to verify notifications are sent
+  - Ensure feedback_request notifications appear in Comms tab of User Details modal
 
 ### 38. Matching Exclusion Rules
 - [x] **Type:** Feature
@@ -199,6 +193,12 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - **Location:** `frontend/src/pages/Matching.jsx`, `backend/src/controllers/adminMatchingController.js`
 - **Completed:** Fixed two issues: (1) Backend now computes effective status based on pairing completion - if any pairings have 'pending' or 'confirmed' status, the round shows as 'in_progress'. (2) Frontend was hardcoding "Completed" badge - now displays actual status from API (in_progress, scheduled, failed, completed).
 
+### 80. Portal Home Page Not Showing Pending Pairings
+- [ ] **Type:** Bug
+- **Description:** When a user has pending/incomplete pairings (visible in the History page), the Portal Home page incorrectly displays the "waiting for next match" empty state instead of showing the active pairing(s). The Home page should display all incomplete/pending matches so users can take action on them.
+- **Location:** `frontend/src/pages/portal/PortalHome.jsx`, `backend/src/controllers/userController.js`
+- **Note:** Use ULTRATHINK when implementing
+
 ---
 
 ## Lower Priority
@@ -273,6 +273,24 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 - [ ] **Type:** Bug (Medium)
 - **Description:** User search for exclusions fetches on every keystroke but doesn't cancel previous requests. If slow request completes after newer one, results will be mismatched. Use `AbortController` or React Query's request cancellation.
 - **Location:** `frontend/src/components/users/UserDetailModal.jsx`
+- **Note:** Use ULTRATHINK when implementing
+
+### 78. User Details Modal Not Closing on Outside Click (Analytics)
+- [ ] **Type:** Bug
+- **Description:** On the /admin/analytics page, when clicking a user name in the Engagement Leaderboard section, the User Details modal opens but does not close when clicking outside of it. The modal should close on backdrop click.
+- **Location:** `frontend/src/pages/Analytics.jsx`
+- **Note:** Use ULTRATHINK when implementing
+
+### 79. Restyle Portal to Match Mercator Digital Branding
+- [ ] **Type:** Enhancement
+- **Description:** Restyle the user portal pages to reflect the style of the Mercator Digital website (https://mercatordigital.com/). Keep all existing page structure and functionality intact - only change colors, typography, and visual styling. Add a subtle nautical theme to align with the Mercator brand. Use the `frontend-design` skill for implementation.
+- **Location:** `frontend/src/pages/portal/`, `frontend/src/components/portal/`, `frontend/src/index.css`
+- **Note:** Use ULTRATHINK when implementing
+
+### 81. Clickable User Names in Matching Preview
+- [ ] **Type:** Enhancement
+- **Description:** Make user names in the Matching Preview section of the /admin/matching page clickable to open the User Details modal. This extends the existing clickable user name functionality (completed in #44) to the preview section for consistency.
+- **Location:** `frontend/src/pages/Matching.jsx`
 - **Note:** Use ULTRATHINK when implementing
 
 ### 36. Admin Notification When Scheduled Match Runs
@@ -420,6 +438,14 @@ This file tracks feature requests, enhancements, and bugs to be addressed.
 ### 35. Bulk User Management
 - [x] **Type:** Feature
 - **Completed:** Checkbox selection, bulk action bar (Opt In, Opt Out, Send Welcome Email, Set Available From), date picker modal
+
+### 2. Log Communications in User Details
+- [x] **Type:** Bug
+- **Completed:** Fixed notification query to use `required: false` on Pairing include; welcome emails now appear in Comms tab
+
+### 47. Users in Grace Period Unexpectedly Showing as Opted Out
+- [x] **Type:** Bug (Critical)
+- **Completed:** Changed opt-out/opt-in endpoints to require POST via confirmation page; email security scanners can no longer trigger auto-opt-outs
 
 ---
 

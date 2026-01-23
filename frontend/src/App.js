@@ -9,6 +9,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/Layout/AdminLayout';
 import PortalLayout from './components/Layout/PortalLayout';
+import logger from './utils/logger';
 
 // Admin Pages
 import Login from './pages/Login';
@@ -44,27 +45,23 @@ function App() {
 
   useEffect(() => {
     const initializeMsal = async () => {
-      console.log('🔐 Initializing MSAL...');
+      logger.log('Initializing MSAL...');
       await msalInstance.initialize();
-      console.log('🔐 MSAL initialized successfully');
+      logger.log('MSAL initialized successfully');
 
       // Handle redirect BEFORE rendering the router
-      console.log('🔐 Handling redirect promise in App.js...');
-      console.log('🔐 Current URL:', window.location.href);
-      console.log('🔐 URL hash:', window.location.hash);
+      logger.log('Handling redirect promise...');
 
       try {
         const redirectResponse = await msalInstance.handleRedirectPromise();
-        console.log('🔐 App.js redirect response:', redirectResponse);
 
         if (redirectResponse) {
-          console.log('🔐 SUCCESS! Token received in App.js');
-          console.log('🔐 Account:', redirectResponse.account?.username);
+          logger.log('Token received from redirect');
         } else {
-          console.log('🔐 No redirect response (either not a redirect or already handled)');
+          logger.log('No redirect response');
         }
       } catch (error) {
-        console.error('❌ Error handling redirect in App.js:', error);
+        logger.error('Error handling redirect:', error.name || 'Unknown');
       }
 
       setIsInitialized(true);

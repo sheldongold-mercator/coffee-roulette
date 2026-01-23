@@ -95,11 +95,14 @@ class AnalyticsService {
 
   /**
    * Get participation trends over time
+   * Returns monthly aggregated data with participation rate
    */
   async getParticipationTrends(months = 6) {
     try {
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - months);
+      startDate.setDate(1); // Start from first of month
+      startDate.setHours(0, 0, 0, 0);
 
       const rounds = await MatchingRound.findAll({
         where: {
@@ -112,15 +115,48 @@ class AnalyticsService {
         attributes: ['id', 'name', 'executed_at', 'total_participants', 'total_pairings']
       });
 
-      const trends = rounds.map(round => ({
-        roundId: round.id,
-        roundName: round.name,
-        date: round.executed_at,
-        participants: round.total_participants,
-        pairings: round.total_pairings
-      }));
+      // Group rounds by month
+      const monthlyData = {};
+      rounds.forEach(round => {
+        const date = new Date(round.executed_at);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-      return trends;
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = {
+            participants: 0,
+            pairings: 0,
+            rounds: 0
+          };
+        }
+        monthlyData[monthKey].participants += round.total_participants || 0;
+        monthlyData[monthKey].pairings += round.total_pairings || 0;
+        monthlyData[monthKey].rounds += 1;
+      });
+
+      // Generate all months in range and format for chart
+      const allMonths = [];
+      const currentDate = new Date();
+      const tempDate = new Date(startDate);
+
+      while (tempDate <= currentDate) {
+        const monthKey = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}`;
+        const monthLabel = tempDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        const data = monthlyData[monthKey];
+
+        allMonths.push({
+          month: monthLabel,
+          monthKey: monthKey,
+          participants: data ? data.participants : 0,
+          pairings: data ? data.pairings : 0,
+          rounds: data ? data.rounds : 0,
+          // Use participants as the "rate" for chart compatibility
+          rate: data ? data.participants : 0
+        });
+
+        tempDate.setMonth(tempDate.getMonth() + 1);
+      }
+
+      return allMonths;
     } catch (error) {
       logger.error('Error getting participation trends:', error);
       throw error;
@@ -264,9 +300,11 @@ class AnalyticsService {
   /**
    * Get detailed department-level analytics breakdown
    * Includes participation rate, completion rate, feedback score, cross-dept connections
+   * Uses aggregated queries to avoid N+1 problem
    */
   async getDepartmentBreakdown() {
     try {
+      // Get department user stats in one query
       const departments = await Department.findAll({
         where: { is_active: true },
         include: [
@@ -277,64 +315,112 @@ class AnalyticsService {
         ]
       });
 
-      const breakdown = await Promise.all(departments.map(async (dept) => {
-        const userIds = dept.users.filter(u => u.is_active).map(u => u.id);
-        const activeUsers = userIds.length;
-        const optedInUsers = dept.users.filter(u => u.is_active && u.is_opted_in).length;
+      // Build department data structure
+      const deptMap = {};
+      const allUserIds = [];
+      departments.forEach(dept => {
+        const activeUsers = dept.users.filter(u => u.is_active);
+        const userIds = activeUsers.map(u => u.id);
+        allUserIds.push(...userIds);
 
-        // Get pairings involving users from this department
-        const pairings = await Pairing.findAll({
-          where: {
-            [Op.or]: [
-              { user1_id: { [Op.in]: userIds } },
-              { user2_id: { [Op.in]: userIds } }
-            ]
-          },
-          include: [
-            { association: 'user1', attributes: ['id', 'department_id'] },
-            { association: 'user2', attributes: ['id', 'department_id'] },
-            { association: 'feedback', attributes: ['rating'] }
+        deptMap[dept.id] = {
+          departmentId: dept.id,
+          departmentName: dept.name,
+          activeUsers: activeUsers.length,
+          optedInUsers: dept.users.filter(u => u.is_active && u.is_opted_in).length,
+          userIds: new Set(userIds),
+          totalPairings: 0,
+          completedPairings: 0,
+          crossDeptPairings: 0,
+          feedbackRatings: []
+        };
+      });
+
+      // If no users, return empty results early
+      if (allUserIds.length === 0) {
+        return departments.map(dept => ({
+          departmentId: dept.id,
+          departmentName: dept.name,
+          activeUsers: 0,
+          optedInUsers: 0,
+          participationRate: 0,
+          totalPairings: 0,
+          completedPairings: 0,
+          completionRate: 0,
+          crossDeptPairings: 0,
+          crossDeptRate: 0,
+          avgFeedbackRating: null,
+          feedbackCount: 0
+        }));
+      }
+
+      // Get all pairings involving any of our users in ONE query
+      const pairings = await Pairing.findAll({
+        where: {
+          [Op.or]: [
+            { user1_id: { [Op.in]: allUserIds } },
+            { user2_id: { [Op.in]: allUserIds } }
           ]
-        });
+        },
+        include: [
+          { association: 'user1', attributes: ['id', 'department_id'] },
+          { association: 'user2', attributes: ['id', 'department_id'] },
+          { association: 'feedback', attributes: ['rating'] }
+        ]
+      });
 
-        const totalPairings = pairings.length;
-        const completedPairings = pairings.filter(p => p.status === 'completed').length;
-        const completionRate = totalPairings > 0 ? Math.round((completedPairings / totalPairings) * 100) : 0;
+      // Process pairings and attribute to departments
+      pairings.forEach(pairing => {
+        const dept1Id = pairing.user1?.department_id;
+        const dept2Id = pairing.user2?.department_id;
+        const isCrossDept = dept1Id !== dept2Id;
+        const isCompleted = pairing.status === 'completed';
 
-        // Cross-department connections
-        const crossDeptPairings = pairings.filter(p =>
-          (userIds.includes(p.user1_id) && p.user2?.department_id !== dept.id) ||
-          (userIds.includes(p.user2_id) && p.user1?.department_id !== dept.id)
-        ).length;
+        // Attribute pairing to each involved department
+        [dept1Id, dept2Id].forEach(deptId => {
+          if (deptId && deptMap[deptId]) {
+            const dept = deptMap[deptId];
+            // Only count if the user belongs to this department
+            const user1InDept = dept.userIds.has(pairing.user1_id);
+            const user2InDept = dept.userIds.has(pairing.user2_id);
 
-        // Average feedback rating for this department's users
-        const allFeedback = [];
-        for (const pairing of pairings) {
-          if (pairing.feedback && pairing.feedback.length > 0) {
-            for (const fb of pairing.feedback) {
-              allFeedback.push(fb.rating);
+            if (user1InDept || user2InDept) {
+              dept.totalPairings++;
+              if (isCompleted) dept.completedPairings++;
+              if (isCrossDept) dept.crossDeptPairings++;
+
+              // Collect feedback ratings
+              if (pairing.feedback && pairing.feedback.length > 0) {
+                pairing.feedback.forEach(fb => {
+                  dept.feedbackRatings.push(fb.rating);
+                });
+              }
             }
           }
-        }
-        const avgRating = allFeedback.length > 0
-          ? (allFeedback.reduce((a, b) => a + b, 0) / allFeedback.length).toFixed(1)
+        });
+      });
+
+      // Build final results
+      const breakdown = Object.values(deptMap).map(dept => {
+        const avgRating = dept.feedbackRatings.length > 0
+          ? (dept.feedbackRatings.reduce((a, b) => a + b, 0) / dept.feedbackRatings.length).toFixed(1)
           : null;
 
         return {
-          departmentId: dept.id,
-          departmentName: dept.name,
-          activeUsers,
-          optedInUsers,
-          participationRate: activeUsers > 0 ? Math.round((optedInUsers / activeUsers) * 100) : 0,
-          totalPairings,
-          completedPairings,
-          completionRate,
-          crossDeptPairings,
-          crossDeptRate: totalPairings > 0 ? Math.round((crossDeptPairings / totalPairings) * 100) : 0,
+          departmentId: dept.departmentId,
+          departmentName: dept.departmentName,
+          activeUsers: dept.activeUsers,
+          optedInUsers: dept.optedInUsers,
+          participationRate: dept.activeUsers > 0 ? Math.round((dept.optedInUsers / dept.activeUsers) * 100) : 0,
+          totalPairings: dept.totalPairings,
+          completedPairings: dept.completedPairings,
+          completionRate: dept.totalPairings > 0 ? Math.round((dept.completedPairings / dept.totalPairings) * 100) : 0,
+          crossDeptPairings: dept.crossDeptPairings,
+          crossDeptRate: dept.totalPairings > 0 ? Math.round((dept.crossDeptPairings / dept.totalPairings) * 100) : 0,
           avgFeedbackRating: avgRating,
-          feedbackCount: allFeedback.length
+          feedbackCount: dept.feedbackRatings.length
         };
-      }));
+      });
 
       // Sort by participation rate descending
       return breakdown.sort((a, b) => b.participationRate - a.participationRate);
@@ -503,47 +589,44 @@ class AnalyticsService {
 
   /**
    * Get engagement leaderboard (most active users by pairing count)
+   * Uses aggregated query to avoid N+1 problem
    */
   async getEngagementLeaderboard(limit = 10) {
     try {
-      // Get all users with their pairing counts
-      const users = await User.findAll({
-        where: { is_active: true },
-        attributes: ['id', 'first_name', 'last_name'],
-        include: [
-          {
-            association: 'department',
-            attributes: ['name']
-          }
-        ]
+      // Use raw SQL with UNION to count pairings for both user1 and user2 in a single query
+      const [results] = await sequelize.query(`
+        SELECT
+          u.id,
+          u.first_name,
+          u.last_name,
+          d.name as department_name,
+          COALESCE(pc.pairing_count, 0) as total_pairings
+        FROM users u
+        LEFT JOIN departments d ON u.department_id = d.id
+        LEFT JOIN (
+          SELECT user_id, COUNT(*) as pairing_count
+          FROM (
+            SELECT user1_id as user_id FROM pairings
+            UNION ALL
+            SELECT user2_id as user_id FROM pairings
+          ) as all_user_pairings
+          GROUP BY user_id
+        ) pc ON u.id = pc.user_id
+        WHERE u.is_active = 1
+          AND pc.pairing_count > 0
+        ORDER BY total_pairings DESC
+        LIMIT :limit
+      `, {
+        replacements: { limit },
+        type: sequelize.QueryTypes.SELECT
       });
 
-      // Count pairings for each user
-      const userPairings = await Promise.all(
-        users.map(async (user) => {
-          const pairingCount = await Pairing.count({
-            where: {
-              [Op.or]: [
-                { user1_id: user.id },
-                { user2_id: user.id }
-              ]
-            }
-          });
-
-          return {
-            id: user.id,
-            name: `${user.first_name} ${user.last_name}`,
-            department: user.department?.name || 'No department',
-            totalPairings: pairingCount
-          };
-        })
-      );
-
-      // Sort by pairings and return top users
-      const leaderboard = userPairings
-        .filter(u => u.totalPairings > 0)
-        .sort((a, b) => b.totalPairings - a.totalPairings)
-        .slice(0, limit);
+      const leaderboard = results.map(row => ({
+        id: row.id,
+        name: `${row.first_name} ${row.last_name}`,
+        department: row.department_name || 'No department',
+        totalPairings: parseInt(row.total_pairings, 10)
+      }));
 
       return leaderboard;
     } catch (error) {

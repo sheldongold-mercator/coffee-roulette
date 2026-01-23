@@ -1,3 +1,5 @@
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 export const msalConfig = {
   auth: {
     clientId: process.env.REACT_APP_AZURE_CLIENT_ID || '',
@@ -12,8 +14,9 @@ export const msalConfig = {
   system: {
     allowNativeBroker: false,
     loggerOptions: {
+      // SECURITY: Only log MSAL messages in development to prevent information leakage
       loggerCallback: (level, message, containsPii) => {
-        if (containsPii) return;
+        if (containsPii || !isDevelopment) return;
         console.log('[MSAL]', message);
       },
       piiLoggingEnabled: false,

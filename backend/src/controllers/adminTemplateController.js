@@ -2,7 +2,7 @@ const { NotificationTemplate, User } = require('../models');
 const logger = require('../utils/logger');
 const sampleData = require('../templates/sampleData');
 const { variableDefinitions, templateMetadata } = sampleData;
-const { interpolate, prepareVariables, interpolateJson, validateTemplate } = require('../utils/templateInterpolation');
+const { interpolate, prepareVariables, interpolateJson, validateTemplate, sanitizeHtml } = require('../utils/templateInterpolation');
 const path = require('path');
 const fs = require('fs');
 
@@ -283,6 +283,21 @@ const updateTemplate = async (req, res) => {
       }
     }
 
+    // SECURITY: Sanitize HTML content to prevent XSS attacks
+    const sanitizedHtmlContent = channel === 'email' && htmlContent
+      ? sanitizeHtml(htmlContent)
+      : null;
+
+    // Log if content was modified by sanitization (potential XSS attempt)
+    if (htmlContent && sanitizedHtmlContent && htmlContent !== sanitizedHtmlContent) {
+      logger.warn(`Template HTML sanitization modified content for ${type}/${channel}`, {
+        adminId: req.user.id,
+        adminEmail: req.user.email,
+        originalLength: htmlContent.length,
+        sanitizedLength: sanitizedHtmlContent.length
+      });
+    }
+
     // Find or create template record
     let [template, created] = await NotificationTemplate.findOrCreate({
       where: { template_type: type, channel },
@@ -292,7 +307,7 @@ const updateTemplate = async (req, res) => {
         name: templateMetadata[type].name,
         description: templateMetadata[type].description,
         subject: channel === 'email' ? subject : null,
-        html_content: channel === 'email' ? htmlContent : null,
+        html_content: sanitizedHtmlContent,
         text_content: channel === 'email' ? textContent : null,
         json_content: channel === 'teams' ? jsonContent : null,
         variables: variableDefinitions[type] || [],
@@ -305,7 +320,7 @@ const updateTemplate = async (req, res) => {
       // Update existing template
       await template.update({
         subject: channel === 'email' ? subject : null,
-        html_content: channel === 'email' ? htmlContent : null,
+        html_content: sanitizedHtmlContent,
         text_content: channel === 'email' ? textContent : null,
         json_content: channel === 'teams' ? jsonContent : null,
         is_active: true,

@@ -7,13 +7,27 @@ const jobOrchestrator = require('../jobs');
 const { getStartOfNextMonth } = require('../utils/helpers');
 const logger = require('../utils/logger');
 
+// SECURITY: Maximum search string length to prevent ReDoS/DoS attacks
+const MAX_SEARCH_LENGTH = 100;
+
+/**
+ * Sanitize search parameter
+ */
+const sanitizeSearch = (search) => {
+  if (!search) return null;
+  return String(search).slice(0, MAX_SEARCH_LENGTH);
+};
+
 /**
  * Get all matching rounds
  * Supports filtering by status, date range, and participant search
  */
 const getMatchingRounds = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, dateFrom, dateTo, search } = req.query;
+    const { page = 1, limit = 20, status, dateFrom, dateTo, search: rawSearch } = req.query;
+
+    // SECURITY: Sanitize search parameter
+    const search = sanitizeSearch(rawSearch);
 
     const where = {};
     if (status) {

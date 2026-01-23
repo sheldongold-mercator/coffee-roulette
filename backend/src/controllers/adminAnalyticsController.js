@@ -1,6 +1,32 @@
 const analyticsService = require('../services/analyticsService');
-const { User, Department, MatchingRound, Pairing, MeetingFeedback } = require('../models');
+const { User, Department, MatchingRound, Pairing, MeetingFeedback, AuditLog } = require('../models');
 const logger = require('../utils/logger');
+
+/**
+ * Create audit log entry for data exports
+ * @param {Object} req - Express request object
+ * @param {string} action - Export action type (e.g., 'export.users')
+ * @param {number} recordCount - Number of records exported
+ */
+const logDataExport = async (req, action, recordCount) => {
+  try {
+    await AuditLog.create({
+      user_id: req.user?.id,
+      action: action,
+      entity_type: 'export',
+      changes: {
+        recordCount: recordCount,
+        exportedAt: new Date().toISOString(),
+        exportedBy: req.user?.email || 'unknown'
+      },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    });
+  } catch (error) {
+    // Don't fail the export if audit logging fails, just log the error
+    logger.error('Failed to create audit log for export:', error);
+  }
+};
 
 /**
  * Simple CSV converter
@@ -227,7 +253,7 @@ const getRecentActivity = async (req, res) => {
  */
 const exportUsers = async (req, res) => {
   try {
-    logger.info(`Admin ${req.user.id} requested users export`);
+    logger.info(`Admin ${req.user.id} (${req.user.email}) requested users export`);
 
     const users = await User.findAll({
       include: [
@@ -251,6 +277,10 @@ const exportUsers = async (req, res) => {
       createdAt: user.created_at
     }));
 
+    // SECURITY: Audit log the data export
+    await logDataExport(req, 'export.users', data.length);
+    logger.info(`Admin ${req.user.id} exported ${data.length} user records`);
+
     const csv = jsonToCSV(data);
 
     res.setHeader('Content-Type', 'text/csv');
@@ -270,7 +300,7 @@ const exportUsers = async (req, res) => {
  */
 const exportPairings = async (req, res) => {
   try {
-    logger.info(`Admin ${req.user.id} requested pairings export`);
+    logger.info(`Admin ${req.user.id} (${req.user.email}) requested pairings export`);
 
     const pairings = await Pairing.findAll({
       include: [
@@ -307,6 +337,10 @@ const exportPairings = async (req, res) => {
       createdAt: pairing.created_at
     }));
 
+    // SECURITY: Audit log the data export
+    await logDataExport(req, 'export.pairings', data.length);
+    logger.info(`Admin ${req.user.id} exported ${data.length} pairing records`);
+
     const csv = jsonToCSV(data);
 
     res.setHeader('Content-Type', 'text/csv');
@@ -326,7 +360,7 @@ const exportPairings = async (req, res) => {
  */
 const exportFeedback = async (req, res) => {
   try {
-    logger.info(`Admin ${req.user.id} requested feedback export`);
+    logger.info(`Admin ${req.user.id} (${req.user.email}) requested feedback export`);
 
     const feedbacks = await MeetingFeedback.findAll({
       include: [
@@ -358,6 +392,10 @@ const exportFeedback = async (req, res) => {
       createdAt: feedback.created_at
     }));
 
+    // SECURITY: Audit log the data export
+    await logDataExport(req, 'export.feedback', data.length);
+    logger.info(`Admin ${req.user.id} exported ${data.length} feedback records`);
+
     const csv = jsonToCSV(data);
 
     res.setHeader('Content-Type', 'text/csv');
@@ -377,7 +415,7 @@ const exportFeedback = async (req, res) => {
  */
 const exportAnalyticsSummary = async (req, res) => {
   try {
-    logger.info(`Admin ${req.user.id} requested analytics summary export`);
+    logger.info(`Admin ${req.user.id} (${req.user.email}) requested analytics summary export`);
 
     const [
       overview,
@@ -406,6 +444,10 @@ const exportAnalyticsSummary = async (req, res) => {
         completion: completionTrends
       }
     };
+
+    // SECURITY: Audit log the data export
+    await logDataExport(req, 'export.analytics_summary', 1);
+    logger.info(`Admin ${req.user.id} exported analytics summary`);
 
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename=analytics-summary.json');

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowDownTrayIcon,
   ChartBarIcon,
@@ -602,12 +602,14 @@ const Analytics = () => {
       </motion.div>
 
       {/* User Detail Modal */}
-      {selectedUserId && (
-        <UserDetailModal
-          userId={selectedUserId}
-          onClose={() => setSelectedUserId(null)}
-        />
-      )}
+      <AnimatePresence>
+        {selectedUserId && (
+          <UserDetailModal
+            userId={selectedUserId}
+            onClose={() => setSelectedUserId(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

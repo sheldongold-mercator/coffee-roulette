@@ -250,7 +250,7 @@ const TemplatePreviewConfirmModal = ({
                         height: '350px',
                         border: 'none',
                       }}
-                      sandbox="allow-same-origin"
+                      sandbox=""
                     />
                   </div>
                 </div>

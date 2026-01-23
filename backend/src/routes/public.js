@@ -1,8 +1,105 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
-const { User } = require('../models');
+const { User, AuditLog } = require('../models');
 const logger = require('../utils/logger');
 const { getFrontendUrl } = require('../config/urls');
+
+/**
+ * SECURITY: Strict rate limiting for public token endpoints
+ * Prevents token enumeration/brute force attacks
+ */
+const publicTokenLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Maximum 10 requests per IP per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: generateRateLimitPage(),
+  handler: (req, res, next, options) => {
+    logger.warn('Rate limit exceeded for public endpoint', {
+      ip: req.ip,
+      path: req.path,
+      userAgent: req.get('user-agent')
+    });
+    res.status(429).send(options.message);
+  },
+  keyGenerator: (req) => req.ip, // Rate limit by IP
+  skip: (req) => process.env.NODE_ENV === 'test' // Skip in test environment
+});
+
+/**
+ * Generate rate limit exceeded page
+ */
+function generateRateLimitPage() {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coffee Roulette - Too Many Requests</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      max-width: 500px;
+      width: 100%;
+      padding: 40px;
+      text-align: center;
+    }
+    .logo { font-size: 48px; margin-bottom: 20px; }
+    h1 { color: #dc2626; margin-bottom: 20px; font-size: 24px; }
+    p { color: #666; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">&#9749;</div>
+    <h1>Too Many Requests</h1>
+    <p>You have made too many requests. Please wait 15 minutes before trying again.</p>
+    <p>If you believe this is an error, please contact support.</p>
+  </div>
+</body>
+</html>
+  `;
+}
+
+/**
+ * Log access attempts to public token endpoints for security monitoring
+ */
+const logTokenAccess = async (req, token, success, action) => {
+  try {
+    await AuditLog.create({
+      action: `public.${action}`,
+      entity_type: 'user_token',
+      entity_id: success ? undefined : null,
+      changes: {
+        tokenPrefix: token ? token.substring(0, 8) + '...' : 'none',
+        success,
+        timestamp: new Date().toISOString()
+      },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    });
+  } catch (error) {
+    // Don't fail the request if audit logging fails
+    logger.error('Failed to log token access:', error);
+  }
+};
+
+// Apply rate limiting to all routes in this router
+router.use(publicTokenLimiter);
 
 /**
  * Helper to generate HTML confirmation page
@@ -127,6 +224,7 @@ router.get('/opt-out/:token', async (req, res) => {
     const { token } = req.params;
 
     if (!token) {
+      await logTokenAccess(req, null, false, 'opt_out_view');
       return res.status(400).send('<h1>Invalid request</h1>');
     }
 
@@ -136,8 +234,13 @@ router.get('/opt-out/:token', async (req, res) => {
     });
 
     if (!user) {
+      await logTokenAccess(req, token, false, 'opt_out_view');
+      // Add small delay on 404 to slow down enumeration attacks
+      await new Promise(resolve => setTimeout(resolve, 500));
       return res.status(404).send('<h1>Invalid or expired link</h1>');
     }
+
+    await logTokenAccess(req, token, true, 'opt_out_view');
 
     // Show confirmation page (don't opt out yet - this prevents email scanner triggers)
     const alreadyOptedOut = !user.is_opted_in;
@@ -159,6 +262,7 @@ router.post('/opt-out/:token', async (req, res) => {
     const { token } = req.params;
 
     if (!token) {
+      await logTokenAccess(req, null, false, 'opt_out_action');
       return res.status(400).send('<h1>Invalid request</h1>');
     }
 
@@ -168,11 +272,14 @@ router.post('/opt-out/:token', async (req, res) => {
     });
 
     if (!user) {
+      await logTokenAccess(req, token, false, 'opt_out_action');
+      await new Promise(resolve => setTimeout(resolve, 500));
       return res.status(404).send('<h1>Invalid or expired link</h1>');
     }
 
     // Check if already opted out
     if (!user.is_opted_in) {
+      await logTokenAccess(req, token, true, 'opt_out_action_already_out');
       return res.status(200).send(generateOptOutPage(user, token, true, false));
     }
 
@@ -182,6 +289,7 @@ router.post('/opt-out/:token', async (req, res) => {
       opted_out_at: new Date()
     });
 
+    await logTokenAccess(req, token, true, 'opt_out_action');
     logger.info(`User ${user.id} (${user.email}) opted out via token link (confirmed)`);
 
     // Show success page
@@ -315,6 +423,7 @@ router.get('/opt-in/:token', async (req, res) => {
     const { token } = req.params;
 
     if (!token) {
+      await logTokenAccess(req, null, false, 'opt_in_view');
       return res.status(400).send('<h1>Invalid request</h1>');
     }
 
@@ -324,8 +433,12 @@ router.get('/opt-in/:token', async (req, res) => {
     });
 
     if (!user) {
+      await logTokenAccess(req, token, false, 'opt_in_view');
+      await new Promise(resolve => setTimeout(resolve, 500));
       return res.status(404).send('<h1>Invalid or expired link</h1>');
     }
+
+    await logTokenAccess(req, token, true, 'opt_in_view');
 
     // Show confirmation page (don't opt in yet - prevents email scanner triggers)
     const alreadyOptedIn = user.is_opted_in;
@@ -347,6 +460,7 @@ router.post('/opt-in/:token', async (req, res) => {
     const { token } = req.params;
 
     if (!token) {
+      await logTokenAccess(req, null, false, 'opt_in_action');
       return res.status(400).send('<h1>Invalid request</h1>');
     }
 
@@ -356,11 +470,14 @@ router.post('/opt-in/:token', async (req, res) => {
     });
 
     if (!user) {
+      await logTokenAccess(req, token, false, 'opt_in_action');
+      await new Promise(resolve => setTimeout(resolve, 500));
       return res.status(404).send('<h1>Invalid or expired link</h1>');
     }
 
     // Check if already opted in
     if (user.is_opted_in) {
+      await logTokenAccess(req, token, true, 'opt_in_action_already_in');
       return res.status(200).send(generateOptInPage(user, token, true, false));
     }
 
@@ -372,6 +489,7 @@ router.post('/opt-in/:token', async (req, res) => {
       skip_grace_period: true // Skip grace period when opting in via link
     });
 
+    await logTokenAccess(req, token, true, 'opt_in_action');
     logger.info(`User ${user.id} (${user.email}) opted in via token link (confirmed)`);
 
     // Show success page
@@ -391,17 +509,29 @@ router.get('/status/:token', async (req, res) => {
   try {
     const { token } = req.params;
 
+    if (!token) {
+      await logTokenAccess(req, null, false, 'status_check');
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Token required'
+      });
+    }
+
     const user = await User.findOne({
       where: { opt_out_token: token },
       include: [{ association: 'department', attributes: ['name', 'is_active'] }]
     });
 
     if (!user) {
+      await logTokenAccess(req, token, false, 'status_check');
+      await new Promise(resolve => setTimeout(resolve, 500));
       return res.status(404).json({
         error: 'Not Found',
         message: 'Invalid link'
       });
     }
+
+    await logTokenAccess(req, token, true, 'status_check');
 
     res.status(200).json({
       email: user.email,

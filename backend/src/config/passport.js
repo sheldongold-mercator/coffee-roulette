@@ -4,10 +4,20 @@ const ExtractJwt = require('passport-jwt').ExtractJwt;
 const { User } = require('../models');
 const logger = require('../utils/logger');
 
+// SECURITY: JWT_SECRET must be explicitly configured - no fallback
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  const errorMsg = 'CRITICAL SECURITY ERROR: JWT_SECRET environment variable is not set. ' +
+    'This is required for secure token validation. ' +
+    'Set JWT_SECRET in your .env file with a strong random value (minimum 32 characters).';
+  logger.error(errorMsg);
+  throw new Error(errorMsg);
+}
+
 // JWT Strategy for validating tokens issued by our backend
 const jwtOptions = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+  secretOrKey: JWT_SECRET,
   algorithms: ['HS256']
 };
 

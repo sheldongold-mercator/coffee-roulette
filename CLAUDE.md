@@ -130,6 +130,10 @@ npm test             # Run tests
 - `notification_templates` - Custom email/Teams templates (with file fallback)
 - `system_settings` - Key-value configuration store (including schedule config)
 - `admin_users` - Admin role assignments
+- `matching_exclusions` - Pairs of users who should never be matched:
+  - `user1_id`, `user2_id` - User pair (smaller ID stored in user1_id for uniqueness)
+  - `reason` - Optional explanation (e.g., manager/direct report, conflict)
+  - Bidirectional: exclusion applies regardless of which user is user1/user2
 
 ### Model Registration
 All models must be added to `backend/src/models/index.js` to be available via destructuring.
@@ -157,7 +161,7 @@ Frontend requires in `.env`:
 
 1. **Admin Dashboard** - Analytics, user management, department controls
 2. **User Portal** - Employee-facing portal for viewing matches, confirming meetings, leaving feedback
-3. **Matching Algorithm** - Smart pairing with cross-department bonuses, repeat penalties, VIP handling
+3. **Matching Algorithm** - Smart pairing with cross-department bonuses, repeat penalties, VIP handling, exclusion rules
 4. **Configurable Schedule** - Weekly/biweekly/monthly matching with inline date/time editing, manual trigger
 5. **Department Phased Rollout** - Enable departments gradually with auto opt-in
 6. **Tokenised Opt-Out** - One-click opt-out links without authentication
@@ -179,6 +183,7 @@ Frontend requires in `.env`:
 - **Frontend dev port:** 3001
 - **Grace period:** New opt-ins wait 48 hours before being eligible for matching
 - **Template fallback:** Custom templates in DB, falls back to file templates when `is_active=false`
+- **Public opt-out endpoints:** GET shows confirmation page, POST performs action (prevents email scanner auto-triggers)
 
 ## Database Operations
 
@@ -192,6 +197,7 @@ TRUNCATE TABLE pairings;
 TRUNCATE TABLE matching_rounds;
 TRUNCATE TABLE notification_queue;
 TRUNCATE TABLE audit_logs;
+TRUNCATE TABLE matching_exclusions;
 TRUNCATE TABLE users;
 SET FOREIGN_KEY_CHECKS = 1;
 UPDATE departments SET is_active = 0;

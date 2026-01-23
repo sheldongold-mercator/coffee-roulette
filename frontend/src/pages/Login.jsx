@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import logger from '../utils/logger';
 
 const Login = () => {
   const { login, isAuthenticated, loading, error } = useAuth();
@@ -15,11 +16,9 @@ const Login = () => {
   }, [isAuthenticated, navigate]);
 
   const handleLogin = async () => {
-    console.log('🔘 Login button clicked!');
+    logger.log('Login button clicked');
     try {
-      console.log('🔘 Calling login function...');
       const result = await login();
-      console.log('🔘 Login result:', result);
       if (result.success) {
         toast.success('Successfully logged in!');
         navigate('/admin/dashboard');
@@ -27,7 +26,7 @@ const Login = () => {
         toast.error(result.error || 'Failed to login');
       }
     } catch (err) {
-      console.error('🔘 Login button error:', err);
+      logger.error('Login error:', err.name || 'Unknown');
       toast.error('Failed to login');
     }
   };

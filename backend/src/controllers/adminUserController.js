@@ -4,6 +4,29 @@ const microsoftGraphService = require('../services/microsoftGraphService');
 const notificationService = require('../services/notificationService');
 const logger = require('../utils/logger');
 
+// SECURITY: Whitelist of allowed sort columns to prevent SQL injection via Sequelize
+const ALLOWED_SORT_COLUMNS = ['id', 'created_at', 'updated_at', 'email', 'first_name', 'last_name', 'is_active', 'is_opted_in'];
+const ALLOWED_SORT_ORDERS = ['ASC', 'DESC'];
+const MAX_SEARCH_LENGTH = 100;
+
+/**
+ * Validate and sanitize sort parameters
+ */
+const validateSortParams = (sortBy, sortOrder) => {
+  const validatedSortBy = ALLOWED_SORT_COLUMNS.includes(sortBy) ? sortBy : 'created_at';
+  const validatedSortOrder = ALLOWED_SORT_ORDERS.includes(sortOrder?.toUpperCase()) ? sortOrder.toUpperCase() : 'DESC';
+  return { sortBy: validatedSortBy, sortOrder: validatedSortOrder };
+};
+
+/**
+ * Validate and sanitize search parameter
+ */
+const sanitizeSearch = (search) => {
+  if (!search) return null;
+  // Truncate to max length to prevent ReDoS/DoS attacks
+  return String(search).slice(0, MAX_SEARCH_LENGTH);
+};
+
 /**
  * Get all users with filtering and pagination
  */
@@ -12,14 +35,20 @@ const getUsers = async (req, res) => {
     const {
       page = 1,
       limit = 50,
-      search,
+      search: rawSearch,
       department,
       status,        // 'active' or 'inactive' - filters is_active
       isOptedIn,     // 'true' or 'false' - filters is_opted_in
       participation, // 'eligible', 'opted_in_excluded', 'opted_out' - computed status
-      sortBy = 'created_at',
-      sortOrder = 'DESC'
+      sortBy: rawSortBy = 'created_at',
+      sortOrder: rawSortOrder = 'DESC'
     } = req.query;
+
+    // SECURITY: Validate sort parameters against whitelist
+    const { sortBy, sortOrder } = validateSortParams(rawSortBy, rawSortOrder);
+
+    // SECURITY: Sanitize search parameter
+    const search = sanitizeSearch(rawSearch);
 
     const where = {};
 

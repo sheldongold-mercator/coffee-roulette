@@ -6,7 +6,7 @@ Internal web application for Mercator IT Solutions to facilitate random employee
 
 Coffee Roulette automatically pairs employees monthly for casual coffee meetings, with features including:
 
-- **Random Pairing Algorithm**: Smart matching with constraints to avoid recent repeats and encourage cross-department connections
+- **Random Pairing Algorithm**: Smart matching with constraints to avoid recent repeats, enforce exclusion rules, and encourage cross-department connections
 - **Microsoft Integration**: OAuth authentication, Outlook calendar auto-scheduling, Teams notifications
 - **Department Management**: Phased rollout capability - enable specific departments gradually
 - **User Onboarding**: Automatic opt-in with welcome emails and one-click opt-out links
@@ -276,6 +276,9 @@ npm run build
 - `POST /api/admin/matching/run` - Trigger matching manually
 - `GET /api/admin/matching/preview` - Preview matching without executing
 - `GET /api/admin/analytics/overview` - Get analytics dashboard data
+- `GET /api/admin/users/:userId/exclusions` - List user's matching exclusions
+- `POST /api/admin/users/:userId/exclusions` - Add matching exclusion for user
+- `DELETE /api/admin/users/exclusions/:exclusionId` - Remove matching exclusion
 
 ### Public Endpoints (No Authentication Required)
 
@@ -303,6 +306,9 @@ Key tables:
 - **system_settings**: Configuration key-value store
 - **admin_users**: Admin role assignments
 - **audit_logs**: Admin action tracking
+- **matching_exclusions**: User pairs that should never be matched together
+  - `user1_id`, `user2_id` - The excluded pair (bidirectional)
+  - `reason` - Optional explanation (e.g., manager/direct report, conflict)
 
 ## Deployment
 
@@ -368,6 +374,7 @@ Coffee Roulette uses a frictionless onboarding system with tokenised opt-out:
 - Opt-out links work without authentication: `/api/public/opt-out/:token`
 - Users can opt back in via `/api/public/opt-in/:token`
 - Status can be checked via `/api/public/status/:token`
+- **Email Scanner Protection**: GET requests show a confirmation page; POST (via button click) performs the action. This prevents corporate email security scanners from automatically triggering opt-outs when scanning links.
 
 **Participation Status**
 Users have three participation statuses:
@@ -382,16 +389,17 @@ The pairing algorithm:
    - Respects `available_from` date for delayed participation
    - Honours `override_department_exclusion` for users in inactive departments
    - Skips grace period if `skip_grace_period` is set
-2. Checks recent pairings (last 3 rounds)
-3. Scores potential matches:
+2. Loads matching exclusions (user pairs that cannot be matched)
+3. Checks recent pairings (last 3 rounds)
+4. Scores potential matches (excluding any pairs in the exclusion list):
    - **-50 points** per recent pairing (penalty)
    - **+20 points** for cross-department matching (bonus)
    - **+10 points** for cross-seniority matching (bonus)
    - Respects user `matching_preference` settings
-4. Selects highest-scoring matches
-5. Handles odd numbers (one person sits out, prioritised next round)
+5. Selects highest-scoring matches
+6. Handles odd numbers (one person sits out, prioritised next round)
    - VIP users (`is_vip = true`) are guaranteed a match
-6. Assigns random icebreaker topics
+7. Assigns random icebreaker topics
 
 **Grace Period**: Users who opted in within the last 48 hours are excluded from matching, giving them time to opt-out if desired. This is configurable via `matching.grace_period_hours`. Admins can bypass this per-user with `skip_grace_period`.
 
